@@ -9,6 +9,7 @@ export const MemoryVault: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [selectedMemory, setSelectedMemory] = useState<Memory | null>(null);
 
   useEffect(() => {
     const fetchMemories = async () => {
@@ -33,6 +34,26 @@ export const MemoryVault: React.FC = () => {
     navigator.clipboard.writeText(url);
     setCopiedId(id);
     setTimeout(() => setCopiedId(null), 2000);
+  };
+
+  const formatRelativeTime = (dateString: string): string => {
+    try {
+      const date = new Date(dateString);
+      const now = new Date();
+      const diffMs = now.getTime() - date.getTime();
+      if (isNaN(diffMs) || diffMs < 0) {
+        return dateString;
+      }
+      const diffMins = Math.floor(diffMs / 60000);
+      if (diffMins < 1) return "Captured just now";
+      if (diffMins < 60) return `Captured ${diffMins} mins ago`;
+      const diffHours = Math.floor(diffMins / 60);
+      if (diffHours < 24) return `Captured ${diffHours} hours ago`;
+      const diffDays = Math.floor(diffHours / 24);
+      return `Captured ${diffDays} days ago`;
+    } catch (e) {
+      return dateString;
+    }
   };
 
   const getMemoryTypeConfig = (type: string) => {
@@ -69,23 +90,29 @@ export const MemoryVault: React.FC = () => {
     return (
       mem.title.toLowerCase().includes(query) ||
       mem.source.toLowerCase().includes(query) ||
-      mem.memory_type.toLowerCase().includes(query)
+      mem.memory_type.toLowerCase().includes(query) ||
+      (mem.summary && mem.summary.toLowerCase().includes(query))
     );
   });
 
   const categories = [
-    { id: "all", label: "all" },
-    { id: "documentation", label: "docs" },
-    { id: "architecture", label: "adrs" },
-    { id: "incident", label: "incidents" }
+    { id: "all", label: "ALL" },
+    { id: "documentation", label: "DOCS" },
+    { id: "architecture", label: "ADRS" },
+    { id: "incident", label: "INCIDENTS" }
   ];
 
   return (
-    <div className="flex flex-col gap-3.5 animate-fadeIn font-premium-body">
+    <div className="flex flex-col gap-3.5 animate-fadeIn font-premium-body h-full relative">
       {/* Search and Filters */}
       <GlassCard className="border-zinc-850 bg-[#080808]/40 shadow-premium">
-        <div className="font-mono text-[8px] text-zinc-500 uppercase tracking-widest mb-2.5 flex items-center gap-1.5">
-          <Database className="w-3 h-3 text-[#FF007A]" /> parcle memory archive
+        <div className="font-mono text-[8px] text-zinc-550 uppercase tracking-widest mb-2.5 flex items-center justify-between">
+          <div className="flex items-center gap-1.5">
+            <Database className="w-3 h-3 text-[#FF007A]" /> parcle memory archive
+          </div>
+          <div className="bg-[#FF007A]/15 border border-[#FF007A]/30 px-2 py-0.5 rounded-full text-[7.5px] text-[#FF007A] font-bold shadow-glow-pink">
+            Memory Blocks: {memories.length}
+          </div>
         </div>
 
         {/* Input box with rounded-[20px] */}
@@ -127,10 +154,18 @@ export const MemoryVault: React.FC = () => {
           <div className="w-5 h-5 border-2 border-t-transparent border-[#FF007A] rounded-full animate-spin" />
           <p className="font-mono text-[9px] text-zinc-550 uppercase tracking-widest">Accessing Parcle archive...</p>
         </div>
-      ) : filteredMemories.length === 0 ? (
+      ) : memories.length === 0 ? (
         <div className="border border-zinc-850 bg-[#080808]/20 rounded-[24px] p-6 text-center">
           <Database className="w-6 h-6 text-zinc-700 mx-auto mb-2" />
           <h4 className="font-premium-header font-bold text-[10px] text-zinc-400 uppercase tracking-wider">Archive Empty</h4>
+          <p className="text-[8.5px] text-zinc-500 mt-1 font-mono">
+            No knowledge blocks captured yet.
+          </p>
+        </div>
+      ) : filteredMemories.length === 0 ? (
+        <div className="border border-zinc-850 bg-[#080808]/20 rounded-[24px] p-6 text-center">
+          <Database className="w-6 h-6 text-zinc-700 mx-auto mb-2" />
+          <h4 className="font-premium-header font-bold text-[10px] text-zinc-400 uppercase tracking-wider">No Matches</h4>
           <p className="text-[8.5px] text-zinc-500 mt-1 font-mono">
             No memories match the current filters in Parcle storage.
           </p>
@@ -146,7 +181,8 @@ export const MemoryVault: React.FC = () => {
             return (
               <div
                 key={mem.id}
-                className="group border border-zinc-850/80 bg-[#080808]/40 rounded-[24px] p-3.5 hover:border-[#FF007A]/30 transition-all duration-200 flex flex-col gap-2 shadow-premium"
+                onClick={() => setSelectedMemory(mem)}
+                className="group border border-zinc-850/80 bg-[#080808]/40 rounded-[24px] p-3.5 hover:border-[#FF007A]/30 cursor-pointer transition-all duration-200 flex flex-col gap-2 shadow-premium"
               >
                 {/* Upper row: Icon, title and badge */}
                 <div className="flex items-start justify-between gap-2.5">
@@ -160,7 +196,7 @@ export const MemoryVault: React.FC = () => {
                       </h4>
                       <div className="flex items-center gap-2.5 font-mono text-[7px] text-zinc-550 mt-0.5 uppercase tracking-wider">
                         <span className="flex items-center gap-0.5">
-                          <Calendar className="w-2.5 h-2.5" /> {mem.created_at}
+                          <Calendar className="w-2.5 h-2.5" /> {formatRelativeTime(mem.created_at)}
                         </span>
                         <span className="flex items-center gap-0.5 max-w-[110px] truncate" title={mem.source}>
                           <Globe className="w-2.5 h-2.5 shrink-0" /> {mem.source}
@@ -174,6 +210,13 @@ export const MemoryVault: React.FC = () => {
                   </span>
                 </div>
 
+                {/* Summary */}
+                {mem.summary && (
+                  <p className="text-[8.5px] text-zinc-400 font-mono line-clamp-2 leading-relaxed bg-[#050505]/65 border border-zinc-900/60 p-2 rounded-[12px] mt-1">
+                    {mem.summary}
+                  </p>
+                )}
+
                 {/* Bottom metadata row */}
                 <div className="flex items-center justify-between pt-2 border-t border-zinc-900/60 mt-1">
                   <div className="flex items-center gap-1.5">
@@ -186,7 +229,7 @@ export const MemoryVault: React.FC = () => {
                   </div>
 
                   {/* Actions */}
-                  <div className="flex items-center gap-1.5">
+                  <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
                     <button
                       onClick={() => copyLink(mem.source_url, mem.id)}
                       className="p-1 rounded-full border border-zinc-850 hover:border-zinc-700 bg-black/40 text-zinc-500 hover:text-white transition-colors"
@@ -212,6 +255,68 @@ export const MemoryVault: React.FC = () => {
               </div>
             );
           })}
+        </div>
+      )}
+
+      {/* Details Modal */}
+      {selectedMemory && (
+        <div className="absolute inset-0 bg-[#050505]/85 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fadeIn">
+          <div className="w-full max-h-[90%] bg-[#0a0a0a] border border-[#FF007A]/30 rounded-[24px] flex flex-col shadow-[0_0_25px_rgba(255,0,122,0.15)] overflow-hidden font-premium-body">
+            
+            {/* Modal Header */}
+            <div className="p-4 border-b border-zinc-900 flex items-center justify-between shrink-0">
+              <span className="font-mono text-[8px] text-[#FF007A] uppercase tracking-widest flex items-center gap-1.5">
+                <Database className="w-3 h-3" /> memory details
+              </span>
+              <button 
+                onClick={() => setSelectedMemory(null)}
+                className="text-zinc-500 hover:text-white font-mono text-[9px] border border-zinc-850 px-2.5 py-0.5 rounded-full hover:border-zinc-700 transition-colors"
+              >
+                CLOSE
+              </button>
+            </div>
+
+            {/* Modal Content */}
+            <div className="p-4 flex-1 overflow-y-auto flex flex-col gap-3.5 scrollbar-thin text-[9.5px]">
+              {/* Title */}
+              <div>
+                <span className="text-zinc-550 font-bold block lowercase text-[7.5px] tracking-wider mb-1">title</span>
+                <h3 className="font-premium-header font-bold text-[11px] text-white leading-snug">
+                  {selectedMemory.title}
+                </h3>
+              </div>
+
+              {/* URL */}
+              <div>
+                <span className="text-zinc-550 font-bold block lowercase text-[7.5px] tracking-wider mb-1">source url</span>
+                <a 
+                  href={selectedMemory.source_url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="font-mono text-[8px] text-[#FF007A] break-all bg-[#050505] p-2 border border-zinc-900 rounded-[12px] hover:border-zinc-800 transition-colors flex items-center justify-between gap-2"
+                >
+                  <span className="truncate flex-1">{selectedMemory.source_url}</span>
+                  <ExternalLink className="w-3 h-3 shrink-0" />
+                </a>
+              </div>
+
+              {/* Summary */}
+              <div>
+                <span className="text-zinc-550 font-bold block lowercase text-[7.5px] tracking-wider mb-1">summary</span>
+                <p className="text-zinc-300 bg-[#050505] p-3 border border-zinc-900 rounded-[12px] leading-relaxed whitespace-pre-wrap">
+                  {selectedMemory.summary || "No summary available for this memory block."}
+                </p>
+              </div>
+
+              {/* Timestamp */}
+              <div>
+                <span className="text-zinc-550 font-bold block lowercase text-[7.5px] tracking-wider mb-1">capture timestamp</span>
+                <p className="text-zinc-400 font-mono text-[8px]">
+                  {selectedMemory.created_at}
+                </p>
+              </div>
+            </div>
+          </div>
         </div>
       )}
     </div>

@@ -17,6 +17,7 @@ export interface Memory {
   created_at: string;
   confidence: number;
   source: string; // File path or Slack channel, etc.
+  summary?: string;
 }
 
 export interface CapturedMemory {
@@ -93,7 +94,8 @@ let MOCK_MEMORIES: Memory[] = [
     source_url: "https://github.com/org/cooperate/blob/main/README.md",
     created_at: "2025-07-02",
     confidence: 0.98,
-    source: "github.com/org/cooperate"
+    source: "github.com/org/cooperate",
+    summary: "Main repository documentation containing quickstart instructions, repository layout, and design conventions."
   },
   {
     id: "mem_002",
@@ -102,7 +104,8 @@ let MOCK_MEMORIES: Memory[] = [
     source_url: "https://wiki.internal.cooperate/ops/deploy-v3",
     created_at: "2025-06-28",
     confidence: 0.94,
-    source: "wiki.internal.cooperate"
+    source: "wiki.internal.cooperate",
+    summary: "Operational workflows, deployment configurations, and rollout pipelines."
   },
   {
     id: "mem_003",
@@ -111,7 +114,8 @@ let MOCK_MEMORIES: Memory[] = [
     source_url: "https://wiki.internal.cooperate/architecture/auth-adr-042",
     created_at: "2025-07-01",
     confidence: 0.96,
-    source: "wiki.internal.cooperate/architecture"
+    source: "wiki.internal.cooperate/architecture",
+    summary: "Design document detailing JWT token validation, OAuth flows, and storage strategies."
   },
   {
     id: "mem_004",
@@ -120,7 +124,8 @@ let MOCK_MEMORIES: Memory[] = [
     source_url: "https://github.com/org/cooperate/issues/849",
     created_at: "2025-06-25",
     confidence: 0.99,
-    source: "github.com/org/cooperate/issues"
+    source: "github.com/org/cooperate/issues",
+    summary: "Post-mortem investigation on Redis connection pool exhaustion."
   },
   {
     id: "mem_005",
@@ -129,7 +134,8 @@ let MOCK_MEMORIES: Memory[] = [
     source_url: "https://wiki.internal.cooperate/architecture/gateway-adr-015",
     created_at: "2025-06-15",
     confidence: 0.89,
-    source: "wiki.internal.cooperate/architecture"
+    source: "wiki.internal.cooperate/architecture",
+    summary: "Architectural decision record outlining API Gateway selections and routing rules."
   },
   {
     id: "mem_006",
@@ -376,7 +382,8 @@ export const api = {
       source_url: m.url,
       created_at: m.capturedAt,
       confidence: 0.95,
-      source: m.source
+      source: m.source,
+      summary: m.summary
     }));
 
     try {
@@ -429,7 +436,8 @@ export const api = {
         source_url: "https://github.com/org/cooperate/blob/main/README.md",
         created_at: "2025-07-02",
         confidence: 0.98,
-        source: "github.com/org/cooperate"
+        source: "github.com/org/cooperate",
+        summary: "Main repository documentation containing quickstart instructions, repository layout, and design conventions."
       },
       {
         id: "mem_002",
@@ -438,7 +446,8 @@ export const api = {
         source_url: "https://wiki.internal.cooperate/ops/deploy-v3",
         created_at: "2025-06-28",
         confidence: 0.94,
-        source: "wiki.internal.cooperate"
+        source: "wiki.internal.cooperate",
+        summary: "Operational workflows, deployment configurations, and rollout pipelines."
       },
       {
         id: "mem_003",
@@ -447,7 +456,8 @@ export const api = {
         source_url: "https://wiki.internal.cooperate/architecture/auth-adr-042",
         created_at: "2025-07-01",
         confidence: 0.96,
-        source: "wiki.internal.cooperate/architecture"
+        source: "wiki.internal.cooperate/architecture",
+        summary: "Design document detailing JWT token validation, OAuth flows, and storage strategies."
       },
       {
         id: "mem_004",
@@ -456,7 +466,8 @@ export const api = {
         source_url: "https://github.com/org/cooperate/issues/849",
         created_at: "2025-06-25",
         confidence: 0.99,
-        source: "github.com/org/cooperate/issues"
+        source: "github.com/org/cooperate/issues",
+        summary: "Post-mortem investigation on Redis connection pool exhaustion."
       },
       {
         id: "mem_005",
@@ -465,7 +476,8 @@ export const api = {
         source_url: "https://wiki.internal.cooperate/architecture/gateway-adr-015",
         created_at: "2025-06-15",
         confidence: 0.89,
-        source: "wiki.internal.cooperate/architecture"
+        source: "wiki.internal.cooperate/architecture",
+        summary: "Architectural decision record outlining API Gateway selections and routing rules."
       },
       {
         id: "mem_006",
