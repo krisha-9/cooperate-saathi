@@ -1,0 +1,29 @@
+{
+  "manifest_version": 3,
+  "name": "CoOperate Saathi",
+  "version": "1.0.0",
+  "description": "AI Engineering Memory Agent that captures docs, discussions, and recalls incidents.",
+  "permissions": [
+    "activeTab",
+    "storage",
+    "scripting"
+  ],
+  "host_permissions": [
+    "<all_urls>"
+  ],
+  "action": {
+    "default_popup": "index.html",
+    "default_title": "CoOperate Saathi"
+  },
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}

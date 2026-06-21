@@ -216,3 +216,10 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Node/Vite specific ignores
+node_modules/
+dist/
+extension/node_modules/
+extension/dist/
+.DS_Store
