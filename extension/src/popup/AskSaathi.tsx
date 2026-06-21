@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
 import { NeonButton } from "../components/buttons/NeonButton";
-import { api, ChatMessage, Memory } from "../services/api";
+import { api, ChatMessage, Memory, getRelatedMemories } from "../services/api";
 import { formatRelativeTime } from "../utils/timeFormatter";
 import { Terminal, Send, Cpu, HelpCircle, FileText, Calendar, Database, ExternalLink, AlertTriangle, Settings } from "lucide-react";
 
@@ -324,7 +324,7 @@ export const AskSaathi: React.FC = () => {
                               title: ref.title,
                               memory_type: ref.type || "documentation",
                               source_url: ref.url,
-                              created_at: new Date().toISOString().split("T")[0],
+                              created_at: new Date().toISOString(),
                               confidence: 0.95,
                               source: "github.com",
                               summary: "Dynamic source context fetched from memory."
@@ -338,6 +338,35 @@ export const AskSaathi: React.FC = () => {
                       </button>
                     ))}
                   </div>
+
+                  {/* Related Knowledge Section under Sources Used */}
+                  {(() => {
+                    const firstRef = msg.references[0];
+                    const refMem = firstRef ? memories.find((m) => m.title === firstRef.title || m.source_url === firstRef.url) : null;
+                    const relatedToChat = refMem ? getRelatedMemories(refMem, memories) : [];
+                    if (relatedToChat.length === 0) return null;
+
+                    return (
+                      <div className="mt-2 pt-1.5 border-t border-zinc-900/40">
+                        <span className="text-[7px] font-bold text-zinc-550 uppercase tracking-widest font-premium-header block mb-1">
+                          Related Knowledge:
+                        </span>
+                        <div className="flex flex-wrap gap-1.5">
+                          {relatedToChat.map((rm) => (
+                            <button
+                              key={rm.id}
+                              type="button"
+                              onClick={() => setSelectedMemory(rm)}
+                              className="px-2.5 py-1 text-[7.5px] font-mono border border-zinc-850 hover:border-[#FF007A]/30 bg-[#0c0c0c]/85 text-zinc-400 hover:text-white rounded-full transition-all flex items-center gap-1 shrink-0"
+                            >
+                              <span className="text-[#FF007A] font-extrabold">•</span>
+                              <span>{rm.title}</span>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </div>
               )}
             </div>
@@ -509,6 +538,33 @@ export const AskSaathi: React.FC = () => {
                 <p className="text-zinc-350 bg-[#050505] p-3 border border-zinc-900 rounded-[12px] leading-relaxed whitespace-pre-wrap">
                   {selectedMemory.summary || "No summary available for this memory block."}
                 </p>
+              </div>
+
+              {/* Related Knowledge Section */}
+              <div>
+                <span className="text-zinc-550 font-bold block lowercase text-[7.5px] tracking-wider mb-1.5">Related Knowledge</span>
+                {getRelatedMemories(selectedMemory, memories).length > 0 ? (
+                  <div className="flex flex-col gap-1.5">
+                    {getRelatedMemories(selectedMemory, memories).map((rm) => (
+                      <button
+                        key={rm.id}
+                        type="button"
+                        onClick={() => {
+                          setSelectedMemory(rm);
+                          setCopiedUrl(false);
+                        }}
+                        className="w-full text-left p-2.5 bg-[#050505] border border-zinc-900 rounded-[12px] hover:border-[#FF007A]/40 transition-colors flex items-center justify-between text-[8px] font-mono text-[#FF007A] group/related"
+                      >
+                        <span className="truncate pr-2">{rm.title}</span>
+                        <span className="text-zinc-650 group-hover/related:text-[#FF007A] transition-colors shrink-0">→</span>
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-[8px] font-mono text-zinc-555 italic bg-[#050505] p-2.5 border border-zinc-900 rounded-[12px]">
+                    No related knowledge found.
+                  </p>
+                )}
               </div>
             </div>
           </div>

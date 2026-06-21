@@ -205,6 +205,46 @@ let MOCK_MEMORIES: Memory[] = [
     created_at: getRelativeISO(30 * 24 * 60 * 60 * 1000), // 30 days ago
     confidence: 0.90,
     source: "wiki.internal.cooperate/ops"
+  },
+  {
+    id: "mem_013",
+    title: "Redis Architecture Guide",
+    memory_type: "architecture",
+    source_url: "https://wiki.internal.cooperate/architecture/redis-v6",
+    created_at: getRelativeISO(35 * 24 * 60 * 60 * 1000), // 35 days ago
+    confidence: 0.96,
+    source: "wiki.internal.cooperate/architecture",
+    summary: "Technical blueprint outlining Redis deployment topology, replication layout, and failover clustering setup."
+  },
+  {
+    id: "mem_014",
+    title: "Backend Deployment Guide",
+    memory_type: "setup_guide",
+    source_url: "https://wiki.internal.cooperate/ops/backend-deployment",
+    created_at: getRelativeISO(40 * 24 * 60 * 60 * 1000), // 40 days ago
+    confidence: 0.93,
+    source: "wiki.internal.cooperate/ops",
+    summary: "Step-by-step pipeline execution steps, target ports, environment overrides, and rollback tasks for python backend."
+  },
+  {
+    id: "mem_015",
+    title: "Release Checklist",
+    memory_type: "setup_guide",
+    source_url: "https://wiki.internal.cooperate/ops/release-checklist",
+    created_at: getRelativeISO(42 * 24 * 60 * 60 * 1000), // 42 days ago
+    confidence: 0.91,
+    source: "wiki.internal.cooperate/ops",
+    summary: "Pre-release QA and smoke verification checkpoints for production branch promotions."
+  },
+  {
+    id: "mem_016",
+    title: "Infrastructure ADR",
+    memory_type: "architecture",
+    source_url: "https://wiki.internal.cooperate/architecture/infra-adr-002",
+    created_at: getRelativeISO(45 * 24 * 60 * 60 * 1000), // 45 days ago
+    confidence: 0.94,
+    source: "wiki.internal.cooperate/architecture",
+    summary: "Architectural decisions surrounding container scheduling, cluster sizing, and database server scaling."
   }
 ];
 
@@ -577,6 +617,46 @@ export const api = {
         created_at: getRelativeISO(30 * 24 * 60 * 60 * 1000),
         confidence: 0.90,
         source: "wiki.internal.cooperate/ops"
+      },
+      {
+        id: "mem_013",
+        title: "Redis Architecture Guide",
+        memory_type: "architecture",
+        source_url: "https://wiki.internal.cooperate/architecture/redis-v6",
+        created_at: getRelativeISO(35 * 24 * 60 * 60 * 1000),
+        confidence: 0.96,
+        source: "wiki.internal.cooperate/architecture",
+        summary: "Technical blueprint outlining Redis deployment topology, replication layout, and failover clustering setup."
+      },
+      {
+        id: "mem_014",
+        title: "Backend Deployment Guide",
+        memory_type: "setup_guide",
+        source_url: "https://wiki.internal.cooperate/ops/backend-deployment",
+        created_at: getRelativeISO(40 * 24 * 60 * 60 * 1000),
+        confidence: 0.93,
+        source: "wiki.internal.cooperate/ops",
+        summary: "Step-by-step pipeline execution steps, target ports, environment overrides, and rollback tasks for python backend."
+      },
+      {
+        id: "mem_015",
+        title: "Release Checklist",
+        memory_type: "setup_guide",
+        source_url: "https://wiki.internal.cooperate/ops/release-checklist",
+        created_at: getRelativeISO(42 * 24 * 60 * 60 * 1000),
+        confidence: 0.91,
+        source: "wiki.internal.cooperate/ops",
+        summary: "Pre-release QA and smoke verification checkpoints for production branch promotions."
+      },
+      {
+        id: "mem_016",
+        title: "Infrastructure ADR",
+        memory_type: "architecture",
+        source_url: "https://wiki.internal.cooperate/architecture/infra-adr-002",
+        created_at: getRelativeISO(45 * 24 * 60 * 60 * 1000),
+        confidence: 0.94,
+        source: "wiki.internal.cooperate/architecture",
+        summary: "Architectural decisions surrounding container scheduling, cluster sizing, and database server scaling."
       }
     ];
     if (typeof window !== "undefined") {
@@ -591,4 +671,61 @@ export const api = {
   getIncidentsSync(): Incident[] {
     return MOCK_INCIDENTS;
   }
+};
+
+export const getRelatedMemories = (current: Memory, all: Memory[]): Memory[] => {
+  const currentTitle = (current.title || "").toLowerCase();
+  const currentSource = (current.source || "").toLowerCase();
+  const currentType = current.memory_type;
+  
+  const stopWords = new Set(["readme.md", "guide", "adr", "incident", "and", "the", "for", "with", "a", "an", "to", "in", "of", "on", "setup"]);
+  const currentKeywords = currentTitle.split(/[\s_\-\.]+/).filter((w) => w.length > 2 && !stopWords.has(w));
+  if (current.summary) {
+    const summaryWords = current.summary.toLowerCase().split(/[\s_\-\.]+/).filter((w) => w.length > 3 && !stopWords.has(w));
+    currentKeywords.push(...summaryWords.slice(0, 5));
+  }
+
+  const scored = all
+    .filter((mem) => mem.id !== current.id)
+    .map((mem) => {
+      let score = 0;
+      const memTitle = (mem.title || "").toLowerCase();
+      const memSource = (mem.source || "").toLowerCase();
+      
+      // 1. Shared keywords in title
+      currentKeywords.forEach((kw) => {
+        if (memTitle.includes(kw)) score += 3;
+        if (mem.summary && mem.summary.toLowerCase().includes(kw)) score += 1;
+      });
+      
+      // 2. Type matches
+      if (mem.memory_type === currentType) score += 2;
+      
+      // 3. Source matches
+      if (memSource && memSource === currentSource && currentSource !== "unknown") score += 2;
+      else if (memSource && memSource.split(".")[0] === currentSource.split(".")[0] && currentSource !== "unknown") score += 1;
+      
+      // 4. Exact substrings in titles
+      if (memTitle && (memTitle.includes(currentTitle) || currentTitle.includes(memTitle))) score += 4;
+      
+      return { mem, score };
+    });
+
+  return scored
+    .filter((item) => item.score > 0)
+    .sort((a, b) => b.score - a.score)
+    .map((item) => item.mem)
+    .slice(0, 4); // return 3-5 (up to 4 matches is perfect)
+};
+
+export const calculateNetworkStats = (allMems: Memory[]): { blocks: number; connections: number } => {
+  const blocks = allMems.length;
+  let connections = 0;
+  
+  allMems.forEach((current) => {
+    const related = getRelatedMemories(current, allMems);
+    connections += related.length;
+  });
+  
+  return { blocks, connections };
 };

@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { GlassCard } from "../components/cards/GlassCard";
 import { NeonButton } from "../components/buttons/NeonButton";
-import { api, Incident } from "../services/api";
-import { Search, AlertTriangle, Copy, Check, Terminal, Flame, Database, ShieldAlert } from "lucide-react";
+import { api, Incident, Memory, getRelatedMemories } from "../services/api";
+import { Search, AlertTriangle, Copy, Check, Terminal, Flame, Database, ShieldAlert, FileText } from "lucide-react";
 
 export const IncidentSearch: React.FC = () => {
   const [query, setQuery] = useState("");
@@ -12,23 +12,34 @@ export const IncidentSearch: React.FC = () => {
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [searched, setSearched] = useState(false);
   const [searchHistory, setSearchHistory] = useState<string[]>([]);
+  const [memories, setMemories] = useState<Memory[]>([]);
 
   const sampleErrors = ["Redis timeout", "ECONNREFUSED", "Deployment failed"];
 
-  // Load search history from local storage on mount
+  // Load search history & memories from local storage on mount
   useEffect(() => {
-    if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.local) {
-      chrome.storage.local.get("incident_search_history", (result) => {
-        setSearchHistory(result.incident_search_history || []);
-      });
-    } else {
+    const initData = async () => {
       try {
-        const localData = localStorage.getItem("incident_search_history");
-        setSearchHistory(localData ? JSON.parse(localData) : []);
+        const data = await api.getMemories();
+        setMemories(data);
       } catch (e) {
         // ignore
       }
-    }
+
+      if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.local) {
+        chrome.storage.local.get("incident_search_history", (result) => {
+          setSearchHistory(result.incident_search_history || []);
+        });
+      } else {
+        try {
+          const localData = localStorage.getItem("incident_search_history");
+          setSearchHistory(localData ? JSON.parse(localData) : []);
+        } catch (e) {
+          // ignore
+        }
+      }
+    };
+    initData();
   }, []);
 
   const handleSearch = async (searchQuery: string) => {
@@ -115,7 +126,7 @@ export const IncidentSearch: React.FC = () => {
         </form>
 
         {/* Popular chips */}
-        <div className="flex items-center gap-2 mt-3 font-mono text-[8px] text-zinc-550">
+        <div className="flex items-center gap-2 mt-3 font-mono text-[8px] text-zinc-555">
           <span>EXAMPLES:</span>
           <div className="flex gap-1.5 flex-wrap">
             {sampleErrors.map((err, idx) => (
@@ -187,6 +198,19 @@ export const IncidentSearch: React.FC = () => {
             const isExpanded = expandedId === inc.id;
             const isCopied = copiedId === inc.id;
             const confidencePercentage = Math.round(inc.confidence * 100);
+
+            // Compute related documentation for this incident
+            const incidentMockMemory: Memory = {
+              id: inc.id,
+              title: inc.title,
+              memory_type: "incident",
+              source_url: "",
+              created_at: inc.timestamp,
+              confidence: inc.confidence,
+              source: inc.source,
+              summary: `${inc.rootCause} ${inc.resolution}`
+            };
+            const relatedDocs = getRelatedMemories(incidentMockMemory, memories);
 
             return (
               <div
@@ -301,7 +325,7 @@ export const IncidentSearch: React.FC = () => {
                     </div>
 
                     {/* Visual Timeline Group */}
-                    <div className="relative border-l border-dashed border-zinc-850 ml-1.5 pl-4 flex flex-col gap-3.5">
+                    <div className="relative border-l border-dashed border-zinc-855 ml-1.5 pl-4 flex flex-col gap-3.5">
                       
                       {/* Timeline Step 1: Incident */}
                       <div className="relative">
@@ -354,7 +378,7 @@ export const IncidentSearch: React.FC = () => {
                       <div className="mt-1 pt-3 border-t border-zinc-900/60">
                         <span className="text-emerald-450 font-bold block uppercase text-[7.5px] tracking-wider mb-2">Recommended Actions:</span>
                         <div className="bg-emerald-500/5 p-2.5 border border-emerald-500/15 rounded-[12px]">
-                          <ul className="flex flex-col gap-1.5 font-mono text-[8px] text-zinc-300">
+                          <ul className="flex flex-col gap-1.5 font-mono text-[8.5px] text-zinc-300">
                             {inc.recommendedActions.map((action, aIdx) => (
                               <li key={aIdx} className="flex items-center gap-1.5">
                                 <span className="text-emerald-400 font-extrabold">✓</span>
@@ -365,6 +389,38 @@ export const IncidentSearch: React.FC = () => {
                         </div>
                       </div>
                     )}
+
+                    {/* Related Documentation Section */}
+                    <div className="mt-1 pt-3 border-t border-zinc-900/60">
+                      <span className="text-[#FF007A] font-bold block uppercase text-[7.5px] tracking-wider mb-2">Related Docs:</span>
+                      {relatedDocs.length > 0 ? (
+                        <div className="flex flex-col gap-1.5">
+                          {relatedDocs.map((doc) => (
+                            <div
+                              key={doc.id}
+                              className="p-2 bg-[#0a0a0a] border border-zinc-900 rounded-[12px] flex items-center justify-between text-[8px] font-mono text-zinc-300"
+                            >
+                              <span className="flex items-center gap-1.5 truncate pr-2">
+                                <FileText className="w-3 h-3 text-[#FF007A] shrink-0" />
+                                <span className="truncate">{doc.title}</span>
+                              </span>
+                              <a
+                                href={doc.source_url}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="text-zinc-550 hover:text-white transition-colors shrink-0 font-bold"
+                              >
+                                View →
+                              </a>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-[8px] font-mono text-zinc-555 italic bg-[#050505] p-2.5 border border-zinc-900 rounded-[12px]">
+                          No related knowledge found.
+                        </p>
+                      )}
+                    </div>
 
                     {/* Source Footer and Copy Action */}
                     <div className="flex items-center justify-between pt-2 border-t border-zinc-900/60 mt-1">

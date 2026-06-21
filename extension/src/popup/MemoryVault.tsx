@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { GlassCard } from "../components/cards/GlassCard";
-import { api, Memory } from "../services/api";
+import { api, Memory, getRelatedMemories, calculateNetworkStats } from "../services/api";
 import { formatRelativeTime } from "../utils/timeFormatter";
 import { Database, Search, Calendar, Globe, FileText, Cpu, AlertTriangle, Settings, HelpCircle, ExternalLink, Link2, Check, ShieldAlert } from "lucide-react";
 
@@ -113,8 +113,10 @@ export const MemoryVault: React.FC<MemoryVaultProps> = ({ setActiveTab }) => {
               Results Found: {filteredMemories.length}
             </div>
           ) : (
-            <div className="bg-[#FF007A]/15 border border-[#FF007A]/30 px-2 py-0.5 rounded-full text-[7.5px] text-[#FF007A] font-bold shadow-glow-pink">
-              {memories.length} Knowledge Blocks Stored
+            <div className="bg-[#FF007A]/15 border border-[#FF007A]/30 px-2.5 py-0.5 rounded-full text-[7.5px] text-[#FF007A] font-bold shadow-glow-pink flex gap-1.5">
+              <span>Blocks: {calculateNetworkStats(memories).blocks}</span>
+              <span className="text-[#FF007A]/40">•</span>
+              <span>Connections: {calculateNetworkStats(memories).connections}</span>
             </div>
           )}
         </div>
@@ -233,6 +235,23 @@ export const MemoryVault: React.FC<MemoryVaultProps> = ({ setActiveTab }) => {
                   <p className="text-[9.5px] text-zinc-300 font-mono leading-relaxed bg-[#050505]/80 border border-zinc-900 p-2.5 rounded-[12px]">
                     {mem.summary}
                   </p>
+                )}
+
+                {/* Related Knowledge List under summary */}
+                {getRelatedMemories(mem, memories).length > 0 && (
+                  <div className="mt-1 flex flex-col gap-1 px-1.5 py-1 bg-[#0c0c0c]/20 border border-zinc-900/40 rounded-[10px]">
+                    <span className="text-[7px] font-mono text-zinc-550 uppercase tracking-wider font-bold">
+                      Related Knowledge
+                    </span>
+                    <ul className="flex flex-col gap-0.5 font-mono text-[7.5px] text-zinc-400">
+                      {getRelatedMemories(mem, memories).map((rm) => (
+                        <li key={rm.id} className="flex items-center gap-1.5 truncate">
+                          <span className="text-[#FF007A] font-black">•</span>
+                          <span className="truncate">{rm.title}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
                 )}
 
                 {/* 4. Status & Action Row */}
@@ -364,6 +383,33 @@ export const MemoryVault: React.FC<MemoryVaultProps> = ({ setActiveTab }) => {
                 <p className="text-zinc-300 bg-[#050505] p-3 border border-zinc-900 rounded-[12px] leading-relaxed whitespace-pre-wrap">
                   {selectedMemory.summary || "No summary available for this memory block."}
                 </p>
+              </div>
+
+              {/* Related Knowledge Section */}
+              <div>
+                <span className="text-zinc-550 font-bold block lowercase text-[7.5px] tracking-wider mb-1.5">Related Knowledge</span>
+                {getRelatedMemories(selectedMemory, memories).length > 0 ? (
+                  <div className="flex flex-col gap-1.5">
+                    {getRelatedMemories(selectedMemory, memories).map((rm) => (
+                      <button
+                        key={rm.id}
+                        type="button"
+                        onClick={() => {
+                          setSelectedMemory(rm);
+                          setCopiedUrl(false);
+                        }}
+                        className="w-full text-left p-2.5 bg-[#050505] border border-zinc-900 rounded-[12px] hover:border-[#FF007A]/40 transition-colors flex items-center justify-between text-[8px] font-mono text-[#FF007A] group/related"
+                      >
+                        <span className="truncate pr-2">{rm.title}</span>
+                        <span className="text-zinc-650 group-hover/related:text-[#FF007A] transition-colors shrink-0">→</span>
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-[8px] font-mono text-zinc-550 italic bg-[#050505] p-2.5 border border-zinc-900 rounded-[12px]">
+                    No related knowledge found.
+                  </p>
+                )}
               </div>
             </div>
           </div>
