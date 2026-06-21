@@ -21,7 +21,7 @@ export const Popup: React.FC = () => {
       case "search":
         return <IncidentSearch />;
       case "vault":
-        return <MemoryVault />;
+        return <MemoryVault setActiveTab={setActiveTab} />;
       case "settings":
         return <Settings />;
       default:
