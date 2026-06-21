@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { GlassCard } from "../components/cards/GlassCard";
 import { NeonButton } from "../components/buttons/NeonButton";
 import { api, Incident } from "../services/api";
@@ -11,8 +11,25 @@ export const IncidentSearch: React.FC = () => {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [searched, setSearched] = useState(false);
+  const [searchHistory, setSearchHistory] = useState<string[]>([]);
 
   const sampleErrors = ["Redis timeout", "ECONNREFUSED", "Deployment failed"];
+
+  // Load search history from local storage on mount
+  useEffect(() => {
+    if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.local) {
+      chrome.storage.local.get("incident_search_history", (result) => {
+        setSearchHistory(result.incident_search_history || []);
+      });
+    } else {
+      try {
+        const localData = localStorage.getItem("incident_search_history");
+        setSearchHistory(localData ? JSON.parse(localData) : []);
+      } catch (e) {
+        // ignore
+      }
+    }
+  }, []);
 
   const handleSearch = async (searchQuery: string) => {
     const activeQuery = searchQuery || query;
@@ -23,11 +40,32 @@ export const IncidentSearch: React.FC = () => {
     setExpandedId(null);
     setSearched(true);
 
+    // Save and persist query to history
+    const clean = activeQuery.trim();
+    setSearchHistory((prev) => {
+      const updated = [clean, ...prev.filter((h) => h !== clean)].slice(0, 5);
+      if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.local) {
+        chrome.storage.local.set({ incident_search_history: updated });
+      } else {
+        try {
+          localStorage.setItem("incident_search_history", JSON.stringify(updated));
+        } catch (e) {
+          // ignore
+        }
+      }
+      return updated;
+    });
+
     try {
       const results = await api.searchIncident(activeQuery);
-      setIncidents(results);
-      if (results.length > 0) {
-        setExpandedId(results[0].id);
+      // Return the top 3 ranked matches sorted by confidence score
+      const ranked = results
+        .sort((a, b) => b.confidence - a.confidence)
+        .slice(0, 3);
+      
+      setIncidents(ranked);
+      if (ranked.length > 0) {
+        setExpandedId(ranked[0].id);
       }
     } catch (err) {
       console.error(err);
@@ -39,7 +77,7 @@ export const IncidentSearch: React.FC = () => {
   const copyToClipboard = (text: string, id: string) => {
     navigator.clipboard.writeText(text);
     setCopiedId(id);
-    setTimeout(() => setCopiedId(null), 2000);
+    setTimeout(() => setCopiedId(null), 3000);
   };
 
   return (
@@ -92,27 +130,60 @@ export const IncidentSearch: React.FC = () => {
             ))}
           </div>
         </div>
+
+        {/* Search History */}
+        {searchHistory.length > 0 && (
+          <div className="mt-3.5 pt-3 border-t border-zinc-900/60 flex flex-col gap-2">
+            <span className="font-mono text-[8px] text-zinc-555 uppercase tracking-widest block font-bold">
+              Recent Searches
+            </span>
+            <ul className="flex flex-col gap-1.5 font-mono text-[8.5px] text-zinc-400">
+              {searchHistory.map((h, idx) => (
+                <li 
+                  key={idx}
+                  onClick={() => handleSearch(h)}
+                  className="hover:text-[#FF007A] cursor-pointer flex items-center gap-1.5 transition-colors"
+                >
+                  <span className="text-[#FF007A] font-extrabold">•</span> {h}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
       </GlassCard>
 
       {/* Incident Result Lists */}
       {searching ? (
         <div className="bg-[#050505] border border-zinc-850 rounded-[24px] p-6 flex flex-col items-center justify-center gap-3">
           <div className="w-5 h-5 border-2 border-t-transparent border-[#FF007A] rounded-full animate-spin" />
-          <p className="font-mono text-[9px] text-zinc-550 uppercase tracking-widest">🐺 Searching incident post-mortems...</p>
+          <p className="font-mono text-[9px] text-zinc-555 uppercase tracking-widest">🐺 Searching incident post-mortems...</p>
         </div>
       ) : searched && incidents.length === 0 ? (
-        <div className="border border-zinc-850 bg-[#080808]/20 rounded-[20px] p-6 text-center flex flex-col items-center gap-2 animate-fadeIn">
+        <div className="border border-zinc-850 bg-[#080808]/20 rounded-[20px] p-6 text-center flex flex-col items-center gap-3 animate-fadeIn font-mono">
           <ShieldAlert className="w-6 h-6 text-[#FF007A] mx-auto opacity-80" />
-          <h4 className="font-premium-header font-extrabold text-[10.5px] text-white uppercase tracking-wider">
-            No matching incident reports found.
+          <h4 className="font-premium-header font-bold text-[10px] text-white uppercase tracking-wider">
+            No similar incident found in Parcle Memory.
           </h4>
-          <p className="text-[8.5px] text-zinc-500 font-mono max-w-[260px] mx-auto leading-normal">
-            No incident logs or post-mortems matched "{query}" in Parcle Memory.
-          </p>
+          <div className="text-left w-full mt-1.5 border-t border-zinc-900/60 pt-3">
+            <span className="text-[7.5px] text-zinc-550 uppercase tracking-wider block font-bold mb-1.5">
+              Suggested next steps:
+            </span>
+            <ul className="flex flex-col gap-1.5 text-[8.5px] text-zinc-400">
+              <li className="flex items-center gap-1.5">
+                <span className="text-[#FF007A]">•</span> Capture additional incidents
+              </li>
+              <li className="flex items-center gap-1.5">
+                <span className="text-[#FF007A]">•</span> Upload troubleshooting guides
+              </li>
+              <li className="flex items-center gap-1.5">
+                <span className="text-[#FF007A]">•</span> Search broader keywords
+              </li>
+            </ul>
+          </div>
         </div>
       ) : (
         <div className="flex flex-col gap-2.5 overflow-y-auto max-h-[310px] pr-0.5 scrollbar-thin">
-          {incidents.map((inc) => {
+          {incidents.map((inc, index) => {
             const isExpanded = expandedId === inc.id;
             const isCopied = copiedId === inc.id;
             const confidencePercentage = Math.round(inc.confidence * 100);
@@ -136,10 +207,15 @@ export const IncidentSearch: React.FC = () => {
                       <AlertTriangle className="w-3.5 h-3.5 text-zinc-500 shrink-0 mt-0.5" />
                     )}
                     <div>
-                      <h4 className="font-premium-header font-bold text-[10.5px] leading-tight text-white pr-2">
-                        {inc.title}
-                      </h4>
-                      <p className="font-mono text-[7px] text-zinc-550 uppercase tracking-widest mt-0.5">
+                      <div className="flex items-center gap-2">
+                        <span className="text-[7.5px] font-mono font-black border border-[#FF007A]/40 bg-[#FF007A]/10 text-[#FF007A] px-1.5 py-0.5 rounded-full shrink-0">
+                          Match #{index + 1}
+                        </span>
+                        <h4 className="font-premium-header font-bold text-[10.5px] leading-tight text-white pr-2">
+                          {inc.title}
+                        </h4>
+                      </div>
+                      <p className="font-mono text-[7px] text-zinc-550 uppercase tracking-widest mt-1">
                         query: "{inc.errorQuery}"
                       </p>
                     </div>
@@ -148,7 +224,7 @@ export const IncidentSearch: React.FC = () => {
                   {/* Miniature Confidence Dial in Header when collapsed */}
                   {!isExpanded && (
                     <div className="shrink-0 flex items-center gap-1.5" title={`Confidence: ${confidencePercentage}%`}>
-                      <span className="text-[7.5px] font-mono text-zinc-500">match</span>
+                      <span className="text-[7.5px] font-mono text-zinc-505">match</span>
                       <div className="w-6.5 h-6.5 relative flex items-center justify-center">
                         <svg className="w-full h-full transform -rotate-90" viewBox="0 0 36 36">
                           <circle
@@ -179,7 +255,7 @@ export const IncidentSearch: React.FC = () => {
 
                 {/* Body details conforming to exact prompt structure */}
                 {isExpanded && (
-                  <div className="px-4 pb-4 border-t border-zinc-900/60 bg-black/40 font-premium-body text-[9px] leading-relaxed flex flex-col gap-3 pt-3.5 animate-fadeIn rounded-b-[24px]">
+                  <div className="px-4 pb-4 border-t border-zinc-900/60 bg-black/40 font-premium-body text-[9px] leading-relaxed flex flex-col gap-4 pt-4 animate-fadeIn rounded-b-[24px]">
                     
                     {/* Header line with details title and large confidence score dial */}
                     <div className="flex items-center justify-between pb-2 border-b border-zinc-900/40">
@@ -224,34 +300,76 @@ export const IncidentSearch: React.FC = () => {
                       </div>
                     </div>
 
-                    {/* Issue section */}
-                    <div>
-                      <span className="text-zinc-550 font-bold block uppercase text-[7.5px] tracking-wider mb-1">Incident:</span>
-                      <p className="text-white bg-[#0a0a0a]/90 p-2 border border-zinc-900 rounded-[12px] text-[8.5px] leading-relaxed">
-                        {inc.title}
-                      </p>
+                    {/* Visual Timeline Group */}
+                    <div className="relative border-l border-dashed border-zinc-850 ml-1.5 pl-4 flex flex-col gap-3.5">
+                      
+                      {/* Timeline Step 1: Incident */}
+                      <div className="relative">
+                        <span className="absolute -left-[20.5px] top-1.5 w-2.5 h-2.5 rounded-full bg-[#FF007A] border border-black shadow-[0_0_4px_#FF007A]" />
+                        <span className="text-zinc-550 font-bold block uppercase text-[7.5px] tracking-wider mb-1">Incident:</span>
+                        <p className="text-white bg-[#0a0a0a]/90 p-2 border border-zinc-900 rounded-[12px] text-[8.5px] leading-relaxed">
+                          {inc.title}
+                        </p>
+                      </div>
+
+                      {/* Timeline Step 2: Root Cause */}
+                      <div className="relative">
+                        <span className="absolute -left-[20.5px] top-1.5 w-2.5 h-2.5 rounded-full bg-[#A855F7] border border-black shadow-[0_0_4px_#A855F7]" />
+                        <span className="text-zinc-550 font-bold block uppercase text-[7.5px] tracking-wider mb-1">ROOT CAUSE:</span>
+                        <p className="text-zinc-400 bg-[#0a0a0a]/90 p-2 border border-zinc-900 rounded-[12px] text-[8.5px] leading-relaxed">
+                          {inc.rootCause}
+                        </p>
+                      </div>
+
+                      {/* Timeline Step 3: Resolution */}
+                      <div className="relative">
+                        <span className="absolute -left-[20.5px] top-1.5 w-2.5 h-2.5 rounded-full bg-emerald-500 border border-black shadow-[0_0_4px_rgba(16,185,129,0.5)]" />
+                        <span className="text-emerald-450 font-bold block uppercase text-[7.5px] tracking-wider mb-1">RESOLUTION:</span>
+                        <p className="text-zinc-300 bg-[#FF007A]/5 p-2 border border-[#FF007A]/15 rounded-[12px] text-[8.5px] leading-relaxed">
+                          {inc.resolution}
+                        </p>
+                      </div>
+
+                      {/* Timeline Step 4: Lessons Learned */}
+                      {inc.lessonsLearned && inc.lessonsLearned.length > 0 && (
+                        <div className="relative">
+                          <span className="absolute -left-[20.5px] top-1.5 w-2.5 h-2.5 rounded-full bg-amber-500 border border-black shadow-[0_0_4px_rgba(245,158,11,0.5)]" />
+                          <span className="text-amber-500 font-bold block uppercase text-[7.5px] tracking-wider mb-1">Lessons Learned:</span>
+                          <div className="bg-[#0a0a0a]/90 p-2 border border-zinc-900 rounded-[12px]">
+                            <ul className="flex flex-col gap-1.5 font-mono text-[8px] text-zinc-400">
+                              {inc.lessonsLearned.map((lesson, lIdx) => (
+                                <li key={lIdx} className="flex items-start gap-1">
+                                  <span className="text-[#FF007A] font-extrabold">•</span>
+                                  <span>{lesson}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        </div>
+                      )}
                     </div>
 
-                    {/* Root Cause section */}
-                    <div>
-                      <span className="text-zinc-550 font-bold block uppercase text-[7.5px] tracking-wider mb-1">ROOT CAUSE:</span>
-                      <p className="text-zinc-400 bg-[#0a0a0a]/90 p-2 border border-zinc-900 rounded-[12px] text-[8.5px] leading-relaxed">
-                        {inc.rootCause}
-                      </p>
-                    </div>
-
-                    {/* Resolution section */}
-                    <div>
-                      <span className="text-[#FF007A] font-bold block uppercase text-[7.5px] tracking-wider mb-1">RESOLUTION:</span>
-                      <p className="text-zinc-300 bg-[#FF007A]/5 p-2 border border-[#FF007A]/15 rounded-[12px] text-[8.5px] leading-relaxed">
-                        {inc.resolution}
-                      </p>
-                    </div>
+                    {/* Recommended Actions */}
+                    {inc.recommendedActions && inc.recommendedActions.length > 0 && (
+                      <div className="mt-1 pt-3 border-t border-zinc-900/60">
+                        <span className="text-emerald-450 font-bold block uppercase text-[7.5px] tracking-wider mb-2">Recommended Actions:</span>
+                        <div className="bg-emerald-500/5 p-2.5 border border-emerald-500/15 rounded-[12px]">
+                          <ul className="flex flex-col gap-1.5 font-mono text-[8px] text-zinc-300">
+                            {inc.recommendedActions.map((action, aIdx) => (
+                              <li key={aIdx} className="flex items-center gap-1.5">
+                                <span className="text-emerald-400 font-extrabold">✓</span>
+                                <span>{action}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      </div>
+                    )}
 
                     {/* Source Footer and Copy Action */}
                     <div className="flex items-center justify-between pt-2 border-t border-zinc-900/60 mt-1">
                       <span className="text-[7.5px] text-zinc-550 lowercase">
-                        source: <strong className="text-zinc-400">Parcle Incident Memory</strong>
+                        source: <strong className="text-zinc-400">{inc.source}</strong>
                       </span>
                       <NeonButton
                         variant="dark"
@@ -259,9 +377,9 @@ export const IncidentSearch: React.FC = () => {
                         className="py-1 px-2.5 text-[7.5px] flex items-center gap-1 h-6 border-zinc-850 bg-[#0c0c0c]/85 hover:text-white"
                       >
                         {isCopied ? (
-                          <>
-                            <Check className="w-2.5 h-2.5 text-[#FF007A]" /> Copied
-                          </>
+                          <span className="text-emerald-400 font-bold flex items-center gap-1">
+                            <Check className="w-2.5 h-2.5 text-emerald-400" /> Resolution copied successfully
+                          </span>
                         ) : (
                           <>
                             <Copy className="w-2.5 h-2.5" /> Copy Resolution

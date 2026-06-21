@@ -76,6 +76,8 @@ export interface Incident {
   timestamp: string;
   source: string;
   confidence: number;
+  lessonsLearned?: string[];
+  recommendedActions?: string[];
 }
 
 export interface ChatResponse {
@@ -216,7 +218,17 @@ let MOCK_INCIDENTS: Incident[] = [
     severity: "high",
     timestamp: getRelativeISO(25 * 60 * 60 * 1000), // 25 hours ago (yesterday), matches mem_004
     source: "Parcle Incident Memory (Issue #849)",
-    confidence: 0.99
+    confidence: 0.99,
+    lessonsLearned: [
+      "Always release Redis clients",
+      "Add timeout monitoring",
+      "Configure retry logic"
+    ],
+    recommendedActions: [
+      "Check Redis health",
+      "Verify connection pool",
+      "Review authentication service"
+    ]
   },
   {
     id: "inc_002",
@@ -227,7 +239,17 @@ let MOCK_INCIDENTS: Incident[] = [
     severity: "high",
     timestamp: getRelativeISO(15 * 24 * 60 * 60 * 1000), // 15 days ago, matches mem_009
     source: "Parcle Incident Memory (DB Migration v3)",
-    confidence: 0.94
+    confidence: 0.94,
+    lessonsLearned: [
+      "Validate secrets lifecycle",
+      "Automate deployment health check restarts",
+      "Set longer database rotation buffers"
+    ],
+    recommendedActions: [
+      "Check database container logs",
+      "Verify rotation token secrets",
+      "Restart api-server deployment pods"
+    ]
   },
   {
     id: "inc_003",
@@ -238,7 +260,17 @@ let MOCK_INCIDENTS: Incident[] = [
     severity: "medium",
     timestamp: getRelativeISO(5 * 60 * 1000), // 5 mins ago, matches mem_001
     source: "Parcle Incident Memory (CI-Worker-02)",
-    confidence: 0.89
+    confidence: 0.89,
+    lessonsLearned: [
+      "Fix unused imports before checking in code",
+      "Sync lint rules across local and remote hooks",
+      "Do not ignore pre-commit typescript alerts"
+    ],
+    recommendedActions: [
+      "Review commit hook typescript warnings",
+      "Re-run local eslint check on authentication code",
+      "Clean up unused hooks"
+    ]
   }
 ];
 
