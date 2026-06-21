@@ -23,9 +23,9 @@ export const Header: React.FC = () => {
         <span className="flex items-center gap-1 text-zinc-450 lowercase">
           powered by parcle
         </span>
-        <span className="flex items-center gap-1.5 text-[#FF007A] lowercase font-semibold">
+        <span className="flex items-center gap-1.5 text-[#FF007A] font-bold uppercase tracking-wider text-[7px]">
           <span className="w-1 h-1 rounded-full bg-[#FF007A] animate-pulse" />
-          connected to parcle memory
+          Parcle Memory Active
         </span>
       </div>
     </div>

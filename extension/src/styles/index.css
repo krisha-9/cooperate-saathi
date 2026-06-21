@@ -82,6 +82,36 @@
   animation: slideIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
+/* Fast backdrop fade-in */
+@keyframes overlayFadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.animate-overlayFade {
+  animation: overlayFadeIn 0.12s ease-out forwards;
+}
+
+/* Fast modal scale-up */
+@keyframes modalScaleUp {
+  from {
+    transform: scale(0.95);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.animate-modalOpen {
+  animation: modalScaleUp 0.15s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
 /* Premium Typography Helper styles */
 .font-premium-header {
   font-family: 'Space Grotesk', 'Inter Tight', system-ui, sans-serif;

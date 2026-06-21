@@ -85,6 +85,10 @@ export interface ChatResponse {
 
 const BACKEND_URL = "http://localhost:8000";
 
+const getRelativeISO = (offsetMs: number): string => {
+  return new Date(Date.now() - offsetMs).toISOString();
+};
+
 // Mock Parcle Memory Database (Person 1 Specs)
 let MOCK_MEMORIES: Memory[] = [
   {
@@ -92,7 +96,7 @@ let MOCK_MEMORIES: Memory[] = [
     title: "README.md",
     memory_type: "documentation",
     source_url: "https://github.com/org/cooperate/blob/main/README.md",
-    created_at: "2025-07-02",
+    created_at: getRelativeISO(5 * 60 * 1000), // 5 mins ago
     confidence: 0.98,
     source: "github.com/org/cooperate",
     summary: "Main repository documentation containing quickstart instructions, repository layout, and design conventions."
@@ -102,7 +106,7 @@ let MOCK_MEMORIES: Memory[] = [
     title: "Deployment Guide",
     memory_type: "setup_guide",
     source_url: "https://wiki.internal.cooperate/ops/deploy-v3",
-    created_at: "2025-06-28",
+    created_at: getRelativeISO(2 * 60 * 60 * 1000), // 2 hours ago
     confidence: 0.94,
     source: "wiki.internal.cooperate",
     summary: "Operational workflows, deployment configurations, and rollout pipelines."
@@ -112,7 +116,7 @@ let MOCK_MEMORIES: Memory[] = [
     title: "Auth Architecture",
     memory_type: "architecture",
     source_url: "https://wiki.internal.cooperate/architecture/auth-adr-042",
-    created_at: "2025-07-01",
+    created_at: getRelativeISO(60 * 60 * 1000), // 1 hour ago
     confidence: 0.96,
     source: "wiki.internal.cooperate/architecture",
     summary: "Design document detailing JWT token validation, OAuth flows, and storage strategies."
@@ -122,7 +126,7 @@ let MOCK_MEMORIES: Memory[] = [
     title: "Redis Incident",
     memory_type: "incident",
     source_url: "https://github.com/org/cooperate/issues/849",
-    created_at: "2025-06-25",
+    created_at: getRelativeISO(25 * 60 * 60 * 1000), // 25 hours ago (yesterday)
     confidence: 0.99,
     source: "github.com/org/cooperate/issues",
     summary: "Post-mortem investigation on Redis connection pool exhaustion."
@@ -132,7 +136,7 @@ let MOCK_MEMORIES: Memory[] = [
     title: "API Gateway ADR",
     memory_type: "architecture",
     source_url: "https://wiki.internal.cooperate/architecture/gateway-adr-015",
-    created_at: "2025-06-15",
+    created_at: getRelativeISO(4 * 24 * 60 * 60 * 1000), // 4 days ago
     confidence: 0.89,
     source: "wiki.internal.cooperate/architecture",
     summary: "Architectural decision record outlining API Gateway selections and routing rules."
@@ -142,7 +146,7 @@ let MOCK_MEMORIES: Memory[] = [
     title: "CI/CD Pipeline Setup",
     memory_type: "setup_guide",
     source_url: "https://github.com/org/cooperate/actions/deploy-workflows",
-    created_at: "2025-06-20",
+    created_at: getRelativeISO(6 * 24 * 60 * 60 * 1000), // 6 days ago
     confidence: 0.92,
     source: "github.com/org/cooperate/actions"
   },
@@ -151,7 +155,7 @@ let MOCK_MEMORIES: Memory[] = [
     title: "Docker Compose Local Dev",
     memory_type: "documentation",
     source_url: "https://github.com/org/cooperate/blob/main/docker-compose.yml",
-    created_at: "2025-06-18",
+    created_at: getRelativeISO(8 * 24 * 60 * 60 * 1000), // 8 days ago
     confidence: 0.91,
     source: "github.com/org/cooperate"
   },
@@ -160,7 +164,7 @@ let MOCK_MEMORIES: Memory[] = [
     title: "Kubernetes Manifests ADR",
     memory_type: "architecture",
     source_url: "https://wiki.internal.cooperate/architecture/k8s-adr-009",
-    created_at: "2025-06-10",
+    created_at: getRelativeISO(12 * 24 * 60 * 60 * 1000), // 12 days ago
     confidence: 0.95,
     source: "wiki.internal.cooperate/architecture"
   },
@@ -169,7 +173,7 @@ let MOCK_MEMORIES: Memory[] = [
     title: "PostgreSQL Migration v3",
     memory_type: "documentation",
     source_url: "https://github.com/org/cooperate/pull/412",
-    created_at: "2025-06-22",
+    created_at: getRelativeISO(15 * 24 * 60 * 60 * 1000), // 15 days ago
     confidence: 0.88,
     source: "github.com/org/cooperate/pulls"
   },
@@ -178,7 +182,7 @@ let MOCK_MEMORIES: Memory[] = [
     title: "AWS S3 Backup Runbook",
     memory_type: "setup_guide",
     source_url: "https://wiki.internal.cooperate/ops/s3-backup-recovery",
-    created_at: "2025-06-12",
+    created_at: getRelativeISO(20 * 24 * 60 * 60 * 1000), // 20 days ago
     confidence: 0.93,
     source: "wiki.internal.cooperate/ops"
   },
@@ -187,7 +191,7 @@ let MOCK_MEMORIES: Memory[] = [
     title: "Elasticsearch Node Tuning",
     memory_type: "incident",
     source_url: "https://github.com/org/cooperate/issues/722",
-    created_at: "2025-06-08",
+    created_at: getRelativeISO(25 * 24 * 60 * 60 * 1000), // 25 days ago
     confidence: 0.87,
     source: "github.com/org/cooperate/issues"
   },
@@ -196,7 +200,7 @@ let MOCK_MEMORIES: Memory[] = [
     title: "Monitoring Grafana Config",
     memory_type: "setup_guide",
     source_url: "https://wiki.internal.cooperate/ops/grafana-alerts",
-    created_at: "2025-06-05",
+    created_at: getRelativeISO(30 * 24 * 60 * 60 * 1000), // 30 days ago
     confidence: 0.90,
     source: "wiki.internal.cooperate/ops"
   }
@@ -210,7 +214,7 @@ let MOCK_INCIDENTS: Incident[] = [
     rootCause: "Unreleased Redis connection instances in API controllers during authentication validations under spike traffic.",
     resolution: "Implemented try/finally blocks to guarantee client connections release back to pool. Configured client read-timeout limits.",
     severity: "high",
-    timestamp: "2025-06-25",
+    timestamp: getRelativeISO(25 * 60 * 60 * 1000), // 25 hours ago (yesterday), matches mem_004
     source: "Parcle Incident Memory (Issue #849)",
     confidence: 0.99
   },
@@ -221,7 +225,7 @@ let MOCK_INCIDENTS: Incident[] = [
     rootCause: "Database credentials mismatch on Kubernetes stateful pods after token refresh rotation script.",
     resolution: "Forced update check of local secrets and restarted API deployment: `kubectl rollout restart deployment/api-server`.",
     severity: "high",
-    timestamp: "2025-06-28",
+    timestamp: getRelativeISO(15 * 24 * 60 * 60 * 1000), // 15 days ago, matches mem_009
     source: "Parcle Incident Memory (DB Migration v3)",
     confidence: 0.94
   },
@@ -232,7 +236,7 @@ let MOCK_INCIDENTS: Incident[] = [
     rootCause: "TypeScript compilation failed check in pre-commit hook during CI/CD build due to unused variables inside a newly introduced auth hook.",
     resolution: "Cleaned up unused variables. Updated `next.config.js` to prevent build blockers during critical hotfixes.",
     severity: "medium",
-    timestamp: "2025-07-02",
+    timestamp: getRelativeISO(5 * 60 * 1000), // 5 mins ago, matches mem_001
     source: "Parcle Incident Memory (CI-Worker-02)",
     confidence: 0.89
   }
@@ -268,7 +272,7 @@ export const api = {
 
     const summary = `This page contains engineering documentation related to ${page.title || "deployment workflows"} and project setup instructions.`;
     const id = `mem_${Date.now().toString().slice(-4)}`;
-    const capturedAt = new Date().toISOString().split("T")[0];
+    const capturedAt = new Date().toISOString();
 
     const capturedMem: CapturedMemory = {
       id,
@@ -434,7 +438,7 @@ export const api = {
         title: "README.md",
         memory_type: "documentation",
         source_url: "https://github.com/org/cooperate/blob/main/README.md",
-        created_at: "2025-07-02",
+        created_at: getRelativeISO(5 * 60 * 1000),
         confidence: 0.98,
         source: "github.com/org/cooperate",
         summary: "Main repository documentation containing quickstart instructions, repository layout, and design conventions."
@@ -444,7 +448,7 @@ export const api = {
         title: "Deployment Guide",
         memory_type: "setup_guide",
         source_url: "https://wiki.internal.cooperate/ops/deploy-v3",
-        created_at: "2025-06-28",
+        created_at: getRelativeISO(2 * 60 * 60 * 1000),
         confidence: 0.94,
         source: "wiki.internal.cooperate",
         summary: "Operational workflows, deployment configurations, and rollout pipelines."
@@ -454,7 +458,7 @@ export const api = {
         title: "Auth Architecture",
         memory_type: "architecture",
         source_url: "https://wiki.internal.cooperate/architecture/auth-adr-042",
-        created_at: "2025-07-01",
+        created_at: getRelativeISO(60 * 60 * 1000),
         confidence: 0.96,
         source: "wiki.internal.cooperate/architecture",
         summary: "Design document detailing JWT token validation, OAuth flows, and storage strategies."
@@ -464,7 +468,7 @@ export const api = {
         title: "Redis Incident",
         memory_type: "incident",
         source_url: "https://github.com/org/cooperate/issues/849",
-        created_at: "2025-06-25",
+        created_at: getRelativeISO(25 * 60 * 60 * 1000),
         confidence: 0.99,
         source: "github.com/org/cooperate/issues",
         summary: "Post-mortem investigation on Redis connection pool exhaustion."
@@ -474,7 +478,7 @@ export const api = {
         title: "API Gateway ADR",
         memory_type: "architecture",
         source_url: "https://wiki.internal.cooperate/architecture/gateway-adr-015",
-        created_at: "2025-06-15",
+        created_at: getRelativeISO(4 * 24 * 60 * 60 * 1000),
         confidence: 0.89,
         source: "wiki.internal.cooperate/architecture",
         summary: "Architectural decision record outlining API Gateway selections and routing rules."
@@ -484,7 +488,7 @@ export const api = {
         title: "CI/CD Pipeline Setup",
         memory_type: "setup_guide",
         source_url: "https://github.com/org/cooperate/actions/deploy-workflows",
-        created_at: "2025-06-20",
+        created_at: getRelativeISO(6 * 24 * 60 * 60 * 1000),
         confidence: 0.92,
         source: "github.com/org/cooperate/actions"
       },
@@ -493,7 +497,7 @@ export const api = {
         title: "Docker Compose Local Dev",
         memory_type: "documentation",
         source_url: "https://github.com/org/cooperate/blob/main/docker-compose.yml",
-        created_at: "2025-06-18",
+        created_at: getRelativeISO(8 * 24 * 60 * 60 * 1000),
         confidence: 0.91,
         source: "github.com/org/cooperate"
       },
@@ -502,7 +506,7 @@ export const api = {
         title: "Kubernetes Manifests ADR",
         memory_type: "architecture",
         source_url: "https://wiki.internal.cooperate/architecture/k8s-adr-009",
-        created_at: "2025-06-10",
+        created_at: getRelativeISO(12 * 24 * 60 * 60 * 1000),
         confidence: 0.95,
         source: "wiki.internal.cooperate/architecture"
       },
@@ -511,7 +515,7 @@ export const api = {
         title: "PostgreSQL Migration v3",
         memory_type: "documentation",
         source_url: "https://github.com/org/cooperate/pull/412",
-        created_at: "2025-06-22",
+        created_at: getRelativeISO(15 * 24 * 60 * 60 * 1000),
         confidence: 0.88,
         source: "github.com/org/cooperate/pulls"
       },
@@ -520,7 +524,7 @@ export const api = {
         title: "AWS S3 Backup Runbook",
         memory_type: "setup_guide",
         source_url: "https://wiki.internal.cooperate/ops/s3-backup-recovery",
-        created_at: "2025-06-12",
+        created_at: getRelativeISO(20 * 24 * 60 * 60 * 1000),
         confidence: 0.93,
         source: "wiki.internal.cooperate/ops"
       },
@@ -529,7 +533,7 @@ export const api = {
         title: "Elasticsearch Node Tuning",
         memory_type: "incident",
         source_url: "https://github.com/org/cooperate/issues/722",
-        created_at: "2025-06-08",
+        created_at: getRelativeISO(25 * 24 * 60 * 60 * 1000),
         confidence: 0.87,
         source: "github.com/org/cooperate/issues"
       },
@@ -538,7 +542,7 @@ export const api = {
         title: "Monitoring Grafana Config",
         memory_type: "setup_guide",
         source_url: "https://wiki.internal.cooperate/ops/grafana-alerts",
-        created_at: "2025-06-05",
+        created_at: getRelativeISO(30 * 24 * 60 * 60 * 1000),
         confidence: 0.90,
         source: "wiki.internal.cooperate/ops"
       }

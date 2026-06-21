@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { GlassCard } from "../components/cards/GlassCard";
 import { api, Memory } from "../services/api";
-import { Database, Search, Calendar, Globe, FileText, Cpu, AlertTriangle, Settings, HelpCircle, ExternalLink, Link2, Check } from "lucide-react";
+import { formatRelativeTime } from "../utils/timeFormatter";
+import { Database, Search, Calendar, Globe, FileText, Cpu, AlertTriangle, Settings, HelpCircle, ExternalLink, Link2, Check, ShieldAlert } from "lucide-react";
 
 interface MemoryVaultProps {
   setActiveTab?: (tab: string) => void;
@@ -39,45 +40,6 @@ export const MemoryVault: React.FC<MemoryVaultProps> = ({ setActiveTab }) => {
     navigator.clipboard.writeText(url);
     setCopiedId(id);
     setTimeout(() => setCopiedId(null), 2000);
-  };
-
-  const formatRelativeTime = (dateString: string): string => {
-    try {
-      const date = new Date(dateString);
-      const now = new Date();
-      const diffMs = now.getTime() - date.getTime();
-      if (isNaN(diffMs)) {
-        return dateString;
-      }
-      const diffSecs = Math.floor(diffMs / 1000);
-      const diffMins = Math.floor(diffSecs / 60);
-      const diffHours = Math.floor(diffMins / 60);
-      const diffDays = Math.floor(diffHours / 24);
-
-      if (diffSecs < 60) {
-        return "Captured just now";
-      }
-      if (diffMins < 60) {
-        return `Captured ${diffMins} mins ago`;
-      }
-      if (diffHours < 24) {
-        return `Captured ${diffHours} ${diffHours === 1 ? "hour" : "hours"} ago`;
-      }
-      if (diffDays === 1) {
-        return "Captured yesterday";
-      }
-      if (diffDays < 7) {
-        return `Captured ${diffDays} days ago`;
-      }
-      const diffWeeks = Math.floor(diffDays / 7);
-      if (diffWeeks < 5) {
-        return `Captured ${diffWeeks} ${diffWeeks === 1 ? "week" : "weeks"} ago`;
-      }
-      const diffMonths = Math.floor(diffDays / 30);
-      return `Captured ${diffMonths} ${diffMonths === 1 ? "month" : "months"} ago`;
-    } catch (e) {
-      return dateString;
-    }
   };
 
   const getMemoryTypeConfig = (type: string) => {
@@ -146,9 +108,15 @@ export const MemoryVault: React.FC<MemoryVaultProps> = ({ setActiveTab }) => {
           <div className="flex items-center gap-1.5 font-bold">
             <Database className="w-3 h-3 text-[#FF007A]" /> Parcle Memory Archive
           </div>
-          <div className="bg-[#FF007A]/15 border border-[#FF007A]/30 px-2 py-0.5 rounded-full text-[7.5px] text-[#FF007A] font-bold shadow-glow-pink">
-            {memories.length} Knowledge Blocks Stored
-          </div>
+          {searchQuery.trim() ? (
+            <div className="bg-[#FF007A]/15 border border-[#FF007A]/30 px-2 py-0.5 rounded-full text-[7.5px] text-[#FF007A] font-bold shadow-glow-pink animate-fadeIn">
+              Results Found: {filteredMemories.length}
+            </div>
+          ) : (
+            <div className="bg-[#FF007A]/15 border border-[#FF007A]/30 px-2 py-0.5 rounded-full text-[7.5px] text-[#FF007A] font-bold shadow-glow-pink">
+              {memories.length} Knowledge Blocks Stored
+            </div>
+          )}
         </div>
 
         {/* Input box with rounded-[20px] */}
@@ -209,11 +177,13 @@ export const MemoryVault: React.FC<MemoryVaultProps> = ({ setActiveTab }) => {
           )}
         </div>
       ) : filteredMemories.length === 0 ? (
-        <div className="border border-zinc-850 bg-[#080808]/20 rounded-[24px] p-6 text-center">
-          <Database className="w-6 h-6 text-zinc-700 mx-auto mb-2" />
-          <h4 className="font-premium-header font-bold text-[10px] text-zinc-400 uppercase tracking-wider">No Matches</h4>
-          <p className="text-[8.5px] text-zinc-500 mt-1 font-mono">
-            No memories match the current filters in Parcle storage.
+        <div className="border border-zinc-850 bg-[#080808]/20 rounded-[20px] p-6 text-center flex flex-col items-center gap-2 animate-fadeIn">
+          <ShieldAlert className="w-6 h-6 text-[#FF007A] mx-auto opacity-80" />
+          <h4 className="font-premium-header font-extrabold text-[10.5px] text-white uppercase tracking-wider">
+            No matching knowledge blocks found.
+          </h4>
+          <p className="text-[8.5px] text-zinc-500 font-mono max-w-[260px] mx-auto leading-normal">
+            No knowledge files matched "{searchQuery}" in your current Parcle Memory index. Try clearing filters or using broader keywords.
           </p>
         </div>
       ) : (
@@ -228,46 +198,48 @@ export const MemoryVault: React.FC<MemoryVaultProps> = ({ setActiveTab }) => {
               <div
                 key={mem.id}
                 onClick={() => setSelectedMemory(mem)}
-                className="group border border-zinc-850/80 bg-[#080808]/40 rounded-[24px] p-3.5 hover:border-[#FF007A]/35 hover:scale-[1.01] hover:shadow-[0_0_12px_rgba(255,0,122,0.08)] cursor-pointer transition-all duration-300 ease-out active:scale-[0.99] flex flex-col gap-2 shadow-premium"
+                className="group border border-zinc-850/80 bg-[#080808]/40 rounded-[20px] p-3.5 hover:border-[#FF007A]/35 hover:scale-[1.01] hover:shadow-[0_0_12px_rgba(255,0,122,0.08)] cursor-pointer transition-all duration-200 ease-out active:scale-[0.99] flex flex-col gap-2.5 shadow-premium"
               >
-                {/* Upper row: Icon, title and badge */}
+                {/* 1. Title Row */}
                 <div className="flex items-start justify-between gap-2.5">
-                  <div className="flex items-center gap-2.5">
+                  <div className="flex items-center gap-2">
                     <div className={`p-1.5 rounded-lg border ${config.color} shrink-0`}>
                       <TypeIcon className="w-3.5 h-3.5" />
                     </div>
-                    <div>
-                      <h4 className="font-premium-header font-bold text-[10.5px] text-white tracking-wide group-hover:text-[#FF007A] transition-colors">
-                        {mem.title}
-                      </h4>
-                      <div className="flex items-center gap-2.5 font-mono text-[7px] text-zinc-550 mt-0.5 uppercase tracking-wider">
-                        <span className="flex items-center gap-0.5">
-                          <Calendar className="w-2.5 h-2.5" /> {formatRelativeTime(mem.created_at)}
-                        </span>
-                        <span className="flex items-center gap-0.5 max-w-[110px] truncate" title={mem.source}>
-                          <Globe className="w-2.5 h-2.5 shrink-0" /> {mem.source}
-                        </span>
-                      </div>
-                    </div>
+                    <h4 className="font-premium-header font-black text-[12px] text-white tracking-wide group-hover:text-[#FF007A] transition-colors leading-tight">
+                      {mem.title}
+                    </h4>
                   </div>
-
-                  <span className={`text-[7px] font-mono border px-1.5 py-0.5 rounded-[4px] uppercase tracking-wider font-semibold shrink-0 ${config.color}`}>
+                  <span className={`text-[7.5px] font-mono border px-2 py-0.5 rounded-[4px] uppercase tracking-wider font-extrabold shrink-0 ${config.color}`}>
                     {config.label}
                   </span>
                 </div>
 
-                {/* Summary */}
+                {/* 2. Metadata Row */}
+                <div className="flex items-center flex-wrap gap-x-2.5 gap-y-1 font-mono text-[8px] text-zinc-400 bg-[#0c0c0c]/40 border border-zinc-900/40 px-2.5 py-1 rounded-[10px]">
+                  <span className="flex items-center gap-1">
+                    <Calendar className="w-3 h-3 text-[#FF007A]" />
+                    <span>{formatRelativeTime(mem.created_at)}</span>
+                  </span>
+                  <span className="text-zinc-700 font-bold">•</span>
+                  <span className="flex items-center gap-1 max-w-[150px] truncate" title={mem.source}>
+                    <Globe className="w-3 h-3 text-[#A855F7]" />
+                    <span className="truncate">{mem.source}</span>
+                  </span>
+                </div>
+
+                {/* 3. Summary */}
                 {mem.summary && (
-                  <p className="text-[8.5px] text-zinc-400 font-mono line-clamp-2 leading-relaxed bg-[#050505]/65 border border-zinc-900/60 p-2 rounded-[12px] mt-1">
+                  <p className="text-[9.5px] text-zinc-300 font-mono leading-relaxed bg-[#050505]/80 border border-zinc-900 p-2.5 rounded-[12px]">
                     {mem.summary}
                   </p>
                 )}
 
-                {/* Bottom metadata row */}
-                <div className="flex items-center justify-between pt-2 border-t border-zinc-900/60 mt-1">
+                {/* 4. Status & Action Row */}
+                <div className="flex items-center justify-between pt-2 border-t border-zinc-900/60">
                   <div className="flex items-center gap-1.5">
                     <span className={`w-1.5 h-1.5 rounded-full ${statusBadge.dotColor} shrink-0`} />
-                    <span className="text-[7.5px] font-mono text-zinc-500 uppercase tracking-wide">
+                    <span className="text-[8px] font-mono text-zinc-400 uppercase tracking-wider font-bold">
                       {statusBadge.text}
                     </span>
                   </div>
@@ -276,23 +248,23 @@ export const MemoryVault: React.FC<MemoryVaultProps> = ({ setActiveTab }) => {
                   <div className="flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
                     <button
                       onClick={() => copyLink(mem.source_url, mem.id)}
-                      className="p-1 rounded-full border border-zinc-850 hover:border-zinc-700 bg-black/40 text-zinc-500 hover:text-white transition-colors"
+                      className="p-1 rounded-full border border-zinc-850 hover:border-zinc-700 bg-black/40 text-zinc-400 hover:text-[#FF007A] transition-colors"
                       title="Copy URL"
                     >
                       {isCopied ? (
-                        <Check className="w-2.5 h-2.5 text-[#FF007A]" />
+                        <Check className="w-3 h-3 text-[#FF007A]" />
                       ) : (
-                        <Link2 className="w-2.5 h-2.5" />
+                        <Link2 className="w-3 h-3" />
                       )}
                     </button>
                     <a
                       href={mem.source_url}
                       target="_blank"
                       rel="noreferrer"
-                      className="p-1 rounded-full border border-zinc-850 hover:border-zinc-700 bg-black/40 text-zinc-500 hover:text-white transition-colors"
+                      className="p-1 rounded-full border border-zinc-850 hover:border-zinc-700 bg-black/40 text-zinc-400 hover:text-white transition-colors"
                       title="Open Source Link"
                     >
-                      <ExternalLink className="w-2.5 h-2.5" />
+                      <ExternalLink className="w-3 h-3" />
                     </a>
                   </div>
                 </div>
@@ -305,11 +277,11 @@ export const MemoryVault: React.FC<MemoryVaultProps> = ({ setActiveTab }) => {
       {/* Details Modal */}
       {selectedMemory && detailsModalConfig && (
         <div 
-          className="absolute inset-0 bg-[#050505]/85 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fadeIn"
+          className="absolute inset-0 bg-[#050505]/85 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-overlayFade"
           onClick={() => setSelectedMemory(null)}
         >
           <div 
-            className="w-full max-h-[95%] bg-[#0a0a0a] border border-[#FF007A]/30 rounded-[24px] flex flex-col shadow-[0_0_25px_rgba(255,0,122,0.15)] overflow-hidden font-premium-body"
+            className="w-full max-h-[95%] bg-[#0a0a0a] border border-[#FF007A]/30 rounded-[24px] flex flex-col shadow-[0_0_25px_rgba(255,0,122,0.15)] overflow-hidden font-premium-body animate-modalOpen"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Modal Header */}

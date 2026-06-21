@@ -46,8 +46,13 @@ export const IncidentSearch: React.FC = () => {
     <div className="flex flex-col gap-3.5 animate-fadeIn font-premium-body">
       {/* Search Input Box */}
       <GlassCard className="border-zinc-850 bg-[#080808]/40 shadow-premium">
-        <div className="font-mono text-[8px] text-zinc-500 uppercase tracking-widest mb-2 flex items-center gap-1.5">
-          <Terminal className="w-3 h-3 text-[#FF007A]" /> incident recall
+        <div className="font-mono text-[8px] text-zinc-500 uppercase tracking-widest mb-2 flex items-center justify-between">
+          <span className="flex items-center gap-1.5"><Terminal className="w-3 h-3 text-[#FF007A]" /> incident recall</span>
+          {searched && (
+            <span className="bg-[#FF007A]/15 border border-[#FF007A]/30 px-2 py-0.5 rounded-full text-[7.5px] text-[#FF007A] font-bold shadow-glow-pink">
+              Results Found: {incidents.length}
+            </span>
+          )}
         </div>
         <form
           onSubmit={(e) => {
@@ -96,11 +101,13 @@ export const IncidentSearch: React.FC = () => {
           <p className="font-mono text-[9px] text-zinc-550 uppercase tracking-widest">🐺 Searching incident post-mortems...</p>
         </div>
       ) : searched && incidents.length === 0 ? (
-        <div className="border border-zinc-850 bg-[#080808]/20 rounded-[24px] p-6 text-center">
-          <ShieldAlert className="w-6 h-6 text-zinc-700 mx-auto mb-2" />
-          <h4 className="font-premium-header font-bold text-[10px] text-zinc-400 uppercase tracking-wider">No Incidents Recalled</h4>
-          <p className="text-[8.5px] text-zinc-500 mt-1 font-mono">
-            🐺 I couldn't find any matching incidents in Parcle Memory.
+        <div className="border border-zinc-850 bg-[#080808]/20 rounded-[20px] p-6 text-center flex flex-col items-center gap-2 animate-fadeIn">
+          <ShieldAlert className="w-6 h-6 text-[#FF007A] mx-auto opacity-80" />
+          <h4 className="font-premium-header font-extrabold text-[10.5px] text-white uppercase tracking-wider">
+            No matching incident reports found.
+          </h4>
+          <p className="text-[8.5px] text-zinc-500 font-mono max-w-[260px] mx-auto leading-normal">
+            No incident logs or post-mortems matched "{query}" in Parcle Memory.
           </p>
         </div>
       ) : (
@@ -176,9 +183,9 @@ export const IncidentSearch: React.FC = () => {
                     
                     {/* Header line with details title and large confidence score dial */}
                     <div className="flex items-center justify-between pb-2 border-b border-zinc-900/40">
-                      <div className="flex items-center gap-1.5 text-[8.5px] font-bold text-[#FF007A] uppercase tracking-wider font-premium-header">
+                      <div className="flex items-center gap-1.5 text-[8.5px] font-black text-[#FF007A] uppercase tracking-wider font-premium-header">
                         <Database className="w-3 h-3 text-[#FF007A]" />
-                        <span>🐺 I found a similar incident!</span>
+                        <span>MATCH FOUND IN PARCLE MEMORY</span>
                       </div>
                       
                       <div className="flex items-center gap-2 bg-[#0a0a0a] border border-zinc-850 px-2 py-0.5 rounded-[12px]">
@@ -219,7 +226,7 @@ export const IncidentSearch: React.FC = () => {
 
                     {/* Issue section */}
                     <div>
-                      <span className="text-zinc-550 font-bold block lowercase text-[7.5px] tracking-wider mb-1">issue</span>
+                      <span className="text-zinc-550 font-bold block uppercase text-[7.5px] tracking-wider mb-1">Incident:</span>
                       <p className="text-white bg-[#0a0a0a]/90 p-2 border border-zinc-900 rounded-[12px] text-[8.5px] leading-relaxed">
                         {inc.title}
                       </p>
@@ -227,7 +234,7 @@ export const IncidentSearch: React.FC = () => {
 
                     {/* Root Cause section */}
                     <div>
-                      <span className="text-zinc-550 font-bold block lowercase text-[7.5px] tracking-wider mb-1">root cause</span>
+                      <span className="text-zinc-550 font-bold block uppercase text-[7.5px] tracking-wider mb-1">ROOT CAUSE:</span>
                       <p className="text-zinc-400 bg-[#0a0a0a]/90 p-2 border border-zinc-900 rounded-[12px] text-[8.5px] leading-relaxed">
                         {inc.rootCause}
                       </p>
@@ -235,7 +242,7 @@ export const IncidentSearch: React.FC = () => {
 
                     {/* Resolution section */}
                     <div>
-                      <span className="text-[#FF007A] font-bold block lowercase text-[7.5px] tracking-wider mb-1">resolution</span>
+                      <span className="text-[#FF007A] font-bold block uppercase text-[7.5px] tracking-wider mb-1">RESOLUTION:</span>
                       <p className="text-zinc-300 bg-[#FF007A]/5 p-2 border border-[#FF007A]/15 rounded-[12px] text-[8.5px] leading-relaxed">
                         {inc.resolution}
                       </p>

@@ -160,7 +160,7 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTa
 
       {/* Floating rounded pill navigation dock */}
       <div className="relative z-20 px-3 pb-3 bg-transparent shrink-0">
-        <nav className="mx-auto bg-[#0A0A0A]/90 backdrop-blur-md border border-zinc-850 py-1.5 px-2 flex justify-between items-center rounded-full shadow-premium">
+        <nav className="mx-auto bg-[#0A0A0A]/90 backdrop-blur-md border border-zinc-850 py-1.5 px-1.5 flex justify-between items-center rounded-2xl shadow-premium">
           {tabs.map((tab) => {
             const Icon = tab.icon;
             const isActive = activeTab === tab.id;
@@ -169,17 +169,19 @@ export const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTa
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`relative flex flex-col items-center justify-center flex-1 py-1 rounded-full transition-all duration-200 ${
-                  isActive ? "bg-white/5 text-cyberGreen shadow-[0_0_8px_rgba(255,0,122,0.03)] font-bold font-premium-header" : "text-zinc-500 hover:text-zinc-300 font-premium-header"
+                className={`relative flex flex-col items-center justify-center flex-1 py-1.5 rounded-xl transition-all duration-150 gap-1 border border-transparent active:scale-95 ${
+                  isActive
+                    ? "bg-[#FF007A]/15 text-[#FF007A] border-[#FF007A]/30 shadow-[0_0_10px_rgba(255,0,122,0.25)] font-bold font-premium-header"
+                    : "text-zinc-400 hover:text-white hover:bg-white/5 font-premium-header font-semibold"
                 }`}
               >
                 <Icon
-                  className={`w-[14px] h-[14px] transition-colors duration-200 ${
-                    isActive ? "text-cyberGreen" : "text-zinc-500 group-hover:text-zinc-300"
+                  className={`w-[16px] h-[16px] transition-colors duration-150 ${
+                    isActive ? "text-[#FF007A]" : "text-zinc-400"
                   }`}
                 />
                 <span
-                  className="text-[7px] mt-0.5 tracking-tight lowercase"
+                  className="text-[8px] tracking-wider uppercase font-bold"
                 >
                   {tab.label}
                 </span>
