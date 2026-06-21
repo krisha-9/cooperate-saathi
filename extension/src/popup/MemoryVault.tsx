@@ -22,6 +22,11 @@ export const MemoryVault: React.FC = () => {
       }
     };
     fetchMemories();
+
+    window.addEventListener("parcle-memory-updated", fetchMemories);
+    return () => {
+      window.removeEventListener("parcle-memory-updated", fetchMemories);
+    };
   }, []);
 
   const copyLink = (url: string, id: string) => {

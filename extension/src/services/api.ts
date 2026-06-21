@@ -19,6 +19,52 @@ export interface Memory {
   source: string; // File path or Slack channel, etc.
 }
 
+export interface CapturedMemory {
+  id: string;
+  title: string;
+  url: string;
+  summary: string;
+  capturedAt: string;
+  type: "documentation";
+  source: string;
+}
+
+const getStoredMemories = (): Promise<CapturedMemory[]> => {
+  return new Promise((resolve) => {
+    if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.local) {
+      chrome.storage.local.get("captured_memories", (result) => {
+        resolve(result.captured_memories || []);
+      });
+    } else {
+      try {
+        const localData = localStorage.getItem("captured_memories");
+        resolve(localData ? JSON.parse(localData) : []);
+      } catch (e) {
+        resolve([]);
+      }
+    }
+  });
+};
+
+const saveMemoryToStorage = async (memory: CapturedMemory): Promise<void> => {
+  const current = await getStoredMemories();
+  const updated = [memory, ...current];
+  if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.local) {
+    return new Promise<void>((resolve) => {
+      chrome.storage.local.set({ captured_memories: updated }, () => {
+        resolve();
+      });
+    });
+  } else {
+    try {
+      localStorage.setItem("captured_memories", JSON.stringify(updated));
+    } catch (e) {
+      // ignore
+    }
+  }
+};
+
+
 export interface Incident {
   id: string;
   title: string;
@@ -205,6 +251,32 @@ export const api = {
     headings?: string[];
     content: string;
   }): Promise<{ success: boolean; memory: Memory }> {
+    let hostname = page.domain || "";
+    if (!hostname) {
+      try {
+        hostname = new URL(page.url).hostname;
+      } catch (e) {
+        hostname = "unknown.domain";
+      }
+    }
+
+    const summary = `This page contains engineering documentation related to ${page.title || "deployment workflows"} and project setup instructions.`;
+    const id = `mem_${Date.now().toString().slice(-4)}`;
+    const capturedAt = new Date().toISOString().split("T")[0];
+
+    const capturedMem: CapturedMemory = {
+      id,
+      title: page.title,
+      url: page.url,
+      summary,
+      capturedAt,
+      type: "documentation",
+      source: hostname
+    };
+
+    // Save to local storage
+    await saveMemoryToStorage(capturedMem);
+
     try {
       const response = await fetch(`${BACKEND_URL}/ingest-page`, {
         method: "POST",
@@ -222,25 +294,15 @@ export const api = {
       return { success: true, memory: data };
     } catch (err) {
       console.warn("[Saathi Link] FastAPI backend offline, simulating local Parcle Memory storage.", err);
-      await new Promise((r) => setTimeout(r, 800));
       
-      let sourceDomain = page.domain || "";
-      if (!sourceDomain) {
-        try {
-          sourceDomain = new URL(page.url).hostname;
-        } catch (e) {
-          sourceDomain = "unknown.domain";
-        }
-      }
-
       const mockMem: Memory = {
-        id: `mem_${Date.now().toString().slice(-4)}`,
+        id,
         title: page.title,
         memory_type: "documentation",
         source_url: page.url,
-        created_at: new Date().toISOString().split("T")[0],
+        created_at: capturedAt,
         confidence: 0.95,
-        source: sourceDomain
+        source: hostname
       };
       MOCK_MEMORIES.unshift(mockMem);
 
@@ -306,19 +368,53 @@ export const api = {
 
   // 4. Get Memories (GET /memories)
   async getMemories(): Promise<Memory[]> {
+    const localCaptured = await getStoredMemories();
+    const mappedLocal: Memory[] = localCaptured.map((m) => ({
+      id: m.id,
+      title: m.title,
+      memory_type: m.type,
+      source_url: m.url,
+      created_at: m.capturedAt,
+      confidence: 0.95,
+      source: m.source
+    }));
+
     try {
       const response = await fetch(`${BACKEND_URL}/memories`);
       if (!response.ok) throw new Error("HTTP error " + response.status);
-      return await response.json();
+      const data = await response.json();
+      
+      const allMems = [...mappedLocal, ...data];
+      const seenIds = new Set<string>();
+      return allMems.filter((mem) => {
+        if (seenIds.has(mem.id)) return false;
+        seenIds.add(mem.id);
+        return true;
+      });
     } catch (err) {
       console.warn("[Saathi Link] FastAPI backend offline, loading memories list from Parcle mocks.", err);
-      await new Promise((r) => setTimeout(r, 450));
-      return [...MOCK_MEMORIES];
+      
+      const allMems = [...mappedLocal, ...MOCK_MEMORIES];
+      const seenIds = new Set<string>();
+      return allMems.filter((mem) => {
+        if (seenIds.has(mem.id)) return false;
+        seenIds.add(mem.id);
+        return true;
+      });
     }
   },
 
   clearLocalMemories() {
     MOCK_MEMORIES = [];
+    if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.local) {
+      chrome.storage.local.remove("captured_memories");
+    } else {
+      try {
+        localStorage.removeItem("captured_memories");
+      } catch (e) {
+        // ignore
+      }
+    }
     if (typeof window !== "undefined") {
       window.dispatchEvent(new CustomEvent("parcle-memory-updated"));
     }
