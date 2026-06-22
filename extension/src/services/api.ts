@@ -87,7 +87,7 @@ export interface ChatResponse {
   sources: { title: string; url: string; type?: string }[];
 }
 
-const BACKEND_URL = "http://127.0.0.1:8000";
+const BACKEND_URL = "http://192.168.1.47:8000";
 
 const getRelativeISO = (offsetMs: number): string => {
   return new Date(Date.now() - offsetMs).toISOString();
