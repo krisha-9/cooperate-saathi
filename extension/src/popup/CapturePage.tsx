@@ -97,14 +97,16 @@ export const CapturePage: React.FC = () => {
       await new Promise((r) => setTimeout(r, 800));
       setStatus("success");
       setErrorMessage("");
-    } catch (err) {
+    } catch (err: any) {
       console.warn("Backend sync failed during capture:", err);
+      const msg = err.message || "Backend sync unavailable";
+      
       // In hybrid mode, memory still remains stored locally.
-      setTerminalLogs((prev) => [...prev, "Stored locally. Backend sync unavailable."]);
+      setTerminalLogs((prev) => [...prev, `Stored locally. ${msg}`]);
       
       await new Promise((r) => setTimeout(r, 800));
       setStatus("success");
-      setErrorMessage("Backend sync unavailable");
+      setErrorMessage(msg);
     }
   };
 
@@ -205,24 +207,24 @@ export const CapturePage: React.FC = () => {
       {/* Success notification */}
       {status === "success" && (
         <div className={`flex items-center gap-3 p-3.5 border rounded-[20px] animate-fadeIn ${
-          errorMessage === "Backend sync unavailable"
+          errorMessage
             ? "bg-amber-500/5 border-amber-500/35 text-white shadow-[0_0_15px_rgba(245,158,11,0.1)]"
             : "bg-[#FF007A]/5 border-[#FF007A]/35 text-white shadow-glow-pink"
         }`}>
-          {errorMessage === "Backend sync unavailable" ? (
+          {errorMessage ? (
             <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0" />
           ) : (
             <CheckCircle2 className="w-4 h-4 text-[#FF007A] shrink-0" />
           )}
           <div className="flex-1">
             <h4 className={`font-premium-header font-bold text-[10.5px] uppercase tracking-wider leading-none ${
-              errorMessage === "Backend sync unavailable" ? "text-amber-500" : "text-[#FF007A]"
+              errorMessage ? "text-amber-500" : "text-[#FF007A]"
             }`}>
-              {errorMessage === "Backend sync unavailable" ? "stored locally" : "stored in parcle"}
+              {errorMessage ? "stored locally" : "stored in parcle"}
             </h4>
             <p className="text-[9px] text-zinc-300 mt-1 font-mono leading-normal">
-              {errorMessage === "Backend sync unavailable"
-                ? "Stored locally. Backend sync unavailable."
+              {errorMessage
+                ? `Stored locally. ${errorMessage}`
                 : "Knowledge Block Added To Parcle Memory"}
             </p>
           </div>
