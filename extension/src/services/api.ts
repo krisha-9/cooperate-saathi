@@ -316,19 +316,38 @@ let MOCK_INCIDENTS: Incident[] = [
   }
 ];
 
+// Helper to parse detailed fetch errors
+export const parseFetchError = (err: any): string => {
+  const msg = err?.message || String(err);
+  if (err?.name === "AbortError" || msg.includes("timeout")) return "Request Timeout";
+  if (msg.includes("Failed to fetch") || msg.includes("NetworkError") || msg.includes("ECONNREFUSED")) return "Connection Refused / Backend Not Running";
+  if (msg.includes("CORS")) return "CORS Error";
+  if (msg.includes("HTTP error")) return `Invalid Response (${msg})`;
+  return msg;
+};
+
 // Helper to determine if backend is online
-export const checkBackendOnline = async (): Promise<boolean> => {
+export const checkBackendDetailed = async (): Promise<{ isOnline: boolean; errorDetail: string }> => {
+  console.log("[Saathi] Checking backend health...");
   try {
-    const res = await fetch(`${BACKEND_URL}/`, { method: "GET", signal: AbortSignal.timeout(1000) });
-    return res.ok || res.status === 404 || res.status === 405;
-  } catch (err) {
-    try {
-      const res2 = await fetch(`${BACKEND_URL}/health`, { method: "GET", signal: AbortSignal.timeout(1000) });
-      return res2.ok;
-    } catch (err2) {
-      return false;
+    const res = await fetch(`${BACKEND_URL}/health`, { method: "GET", signal: AbortSignal.timeout(2000) });
+    if (res.ok) {
+      console.log("[Saathi] Backend connected");
+      return { isOnline: true, errorDetail: "" };
+    } else {
+      console.log("[Saathi] Backend unreachable: HTTP error", res.status);
+      return { isOnline: false, errorDetail: `Invalid Response (HTTP ${res.status})` };
     }
+  } catch (err) {
+    const detail = parseFetchError(err);
+    console.log(`[Saathi] Backend unreachable: ${detail}`);
+    return { isOnline: false, errorDetail: detail };
   }
+};
+
+export const checkBackendOnline = async (): Promise<boolean> => {
+  const res = await checkBackendDetailed();
+  return res.isOnline;
 };
 
 export const api = {
@@ -363,6 +382,7 @@ export const api = {
     await saveMemoryToStorage(capturedMem);
 
     // Step 2: POST to backend
+    console.log("[Saathi] Sending page to backend...");
     try {
       const response = await fetch(`${BACKEND_URL}/ingest-page`, {
         method: "POST",
@@ -378,13 +398,15 @@ export const api = {
       if (!response.ok) throw new Error("HTTP error " + response.status);
       const data = await response.json();
       
+      console.log("[Saathi] Ingest success");
       if (typeof window !== "undefined") {
         window.dispatchEvent(new CustomEvent("parcle-memory-updated"));
       }
 
       return { success: true, message: data.message || "Ingested successfully" };
     } catch (err) {
-      console.warn("[Saathi Link] FastAPI backend offline, simulating local Parcle Memory storage.", err);
+      const detail = parseFetchError(err);
+      console.warn(`[Saathi] Backend unreachable: ${detail}`, err);
       
       const mockMem: Memory = {
         id,
@@ -402,8 +424,8 @@ export const api = {
         window.dispatchEvent(new CustomEvent("parcle-memory-updated"));
       }
 
-      // Throw error to signal sync failure so the UI can show backend sync unavailable message
-      throw new Error("Backend sync unavailable");
+      // Throw detailed error to signal sync failure so the UI can show exact failure reason
+      throw new Error(`Backend sync unavailable: ${detail}`);
     }
   },
 
@@ -437,6 +459,7 @@ export const api = {
 
   // 2. Ask Saathi (POST /ask)
   async askQuestion(question: string): Promise<ChatResponse> {
+    console.log("[Saathi] Sending ask request to backend...");
     try {
       const response = await fetch(`${BACKEND_URL}/ask`, {
         method: "POST",
@@ -447,13 +470,15 @@ export const api = {
 
       if (!response.ok) throw new Error("HTTP error " + response.status);
       const data = await response.json();
+      console.log("[Saathi] Ask request success");
       return {
         answer: data.answer,
         sources: [] // Will be populated locally by component to maintain styling and references
       };
     } catch (err) {
-      console.warn("[Saathi Link] FastAPI backend offline, triggering fallback response.", err);
-      throw err;
+      const detail = parseFetchError(err);
+      console.warn(`[Saathi] Backend unreachable during ask request: ${detail}`, err);
+      throw new Error(`Backend sync unavailable: ${detail}`);
     }
   },
 
@@ -464,6 +489,7 @@ export const api = {
 
   // 3. Search Incidents (POST /search-incidents)
   async searchIncidents(error_message: string, context: string): Promise<Incident[]> {
+    console.log("[Saathi] Sending search incidents request to backend...");
     try {
       const response = await fetch(`${BACKEND_URL}/search-incidents`, {
         method: "POST",
@@ -476,6 +502,7 @@ export const api = {
       const data = await response.json();
       
       const rawIncidents = data.incidents || [];
+      console.log("[Saathi] Search incidents success");
       return rawIncidents.map((inc: any, idx: number) => ({
         id: inc.id || `inc_b_${idx}_${Date.now()}`,
         title: inc.title || "Incident Match",
@@ -492,8 +519,9 @@ export const api = {
         recommendedActions: inc.recommendedActions || []
       }));
     } catch (err) {
-      console.warn("[Saathi Link] FastAPI backend offline, simulating incident retrieval.", err);
-      throw err;
+      const detail = parseFetchError(err);
+      console.warn(`[Saathi] Backend unreachable during incident search: ${detail}`, err);
+      throw new Error(`Backend sync unavailable: ${detail}`);
     }
   },
 
@@ -504,6 +532,7 @@ export const api = {
 
   // 4. Store Incident (POST /store-incident)
   async storeIncident(error_message: string, context: string): Promise<Incident> {
+    console.log("[Saathi] Sending store incident request to backend...");
     try {
       const response = await fetch(`${BACKEND_URL}/store-incident`, {
         method: "POST",
@@ -514,6 +543,7 @@ export const api = {
 
       if (!response.ok) throw new Error("HTTP error " + response.status);
       const data = await response.json();
+      console.log("[Saathi] Store incident success");
 
       const storedInc: Incident = {
         id: data.id || `inc_s_${Date.now()}`,
@@ -535,7 +565,8 @@ export const api = {
       MOCK_INCIDENTS.unshift(storedInc);
       return storedInc;
     } catch (err) {
-      console.warn("[Saathi Link] Store incident backend offline, saving locally.", err);
+      const detail = parseFetchError(err);
+      console.warn(`[Saathi] Backend unreachable during store incident: ${detail}`, err);
       const localInc: Incident = {
         id: `inc_l_${Date.now().toString().slice(-4)}`,
         title: `Incident: ${error_message}`,
@@ -548,7 +579,7 @@ export const api = {
         source: "Local Fallback Memory",
         confidence: 0.9,
         context: context,
-        lessonsLearned: ["Local mode active", "Backend sync was unavailable"],
+        lessonsLearned: ["Local mode active", `Backend error: ${detail}`],
         recommendedActions: ["Verify service endpoints when backend online"]
       };
       MOCK_INCIDENTS.unshift(localInc);
@@ -570,10 +601,12 @@ export const api = {
       summary: m.summary
     }));
 
+    console.log("[Saathi] Fetching memories from backend...");
     try {
       const response = await fetch(`${BACKEND_URL}/memories`, { signal: AbortSignal.timeout(3000) });
       if (!response.ok) throw new Error("HTTP error " + response.status);
       const data = await response.json();
+      console.log("[Saathi] Fetch memories success");
       
       const allMems = [...mappedLocal, ...data];
       const seenIds = new Set<string>();
@@ -583,7 +616,8 @@ export const api = {
         return true;
       });
     } catch (err) {
-      console.warn("[Saathi Link] FastAPI backend offline, loading memories list from Parcle mocks.", err);
+      const detail = parseFetchError(err);
+      console.warn(`[Saathi] Backend unreachable during fetch memories: ${detail}`, err);
       
       const allMems = [...mappedLocal, ...MOCK_MEMORIES];
       const seenIds = new Set<string>();
