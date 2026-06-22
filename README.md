@@ -78,4 +78,7 @@ To load the extension in Google Chrome:
 
 - `extension/` — Chrome companion extension source code, popup tabs, and components.
 - `backend/` — FastAPI backend code, agent modules, and schema definitions.
-- `docs/` — Architecture design records, guidelines, and reference guides.
+- `docs/` — Architecture design records, guidelines, and reference guides.   
+
+Here's the link of our project:
+https://youtube.com/shorts/_m40J3HhX30?feature=share
