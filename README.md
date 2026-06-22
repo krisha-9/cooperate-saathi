@@ -39,7 +39,7 @@ CoOperate Saathi uses a **Hybrid Architecture** where `chrome.storage.local` ser
 
 ---
 
-## 🚀 Quickstart & Setup
+## Quickstart & Setup
 
 ### 1. Prerequisites
 - **Node.js**: v18 or later
@@ -74,7 +74,7 @@ To load the extension in Google Chrome:
 
 ---
 
-## 📦 Directory Structure
+## Directory Structure
 
 - `extension/` — Chrome companion extension source code, popup tabs, and components.
 - `backend/` — FastAPI backend code, agent modules, and schema definitions.
