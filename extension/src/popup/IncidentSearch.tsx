@@ -14,9 +14,16 @@ export const IncidentSearch: React.FC = () => {
   const [searchHistory, setSearchHistory] = useState<string[]>([]);
   const [memories, setMemories] = useState<Memory[]>([]);
 
+  // New state variables for storing incidents and error handling
+  const [storing, setStoring] = useState(false);
+  const [storedIncident, setStoredIncident] = useState<Incident | null>(null);
+  const [storeStatusMsg, setStoreStatusMsg] = useState("");
+  const [searchError, setSearchError] = useState("");
+  const [activeTabContext, setActiveTabContext] = useState("unknown");
+
   const sampleErrors = ["Redis timeout", "ECONNREFUSED", "Deployment failed"];
 
-  // Load search history & memories from local storage on mount
+  // Load search history & memories from local storage & active tab URL context
   useEffect(() => {
     const initData = async () => {
       try {
@@ -24,6 +31,15 @@ export const IncidentSearch: React.FC = () => {
         setMemories(data);
       } catch (e) {
         // ignore
+      }
+
+      if (typeof chrome !== "undefined" && chrome.tabs) {
+        chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+          const tab = tabs[0];
+          if (tab && tab.url) {
+            setActiveTabContext(tab.url);
+          }
+        });
       }
 
       if (typeof chrome !== "undefined" && chrome.storage && chrome.storage.local) {
@@ -50,6 +66,9 @@ export const IncidentSearch: React.FC = () => {
     setQuery(activeQuery);
     setExpandedId(null);
     setSearched(true);
+    setSearchError("");
+    setStoreStatusMsg("");
+    setStoredIncident(null);
 
     // Save and persist query to history
     const clean = activeQuery.trim();
@@ -68,7 +87,7 @@ export const IncidentSearch: React.FC = () => {
     });
 
     try {
-      const results = await api.searchIncident(activeQuery);
+      const results = await api.searchIncidents(activeQuery, activeTabContext);
       // Return the top 3 ranked matches sorted by confidence score
       const ranked = results
         .sort((a, b) => b.confidence - a.confidence)
@@ -79,9 +98,52 @@ export const IncidentSearch: React.FC = () => {
         setExpandedId(ranked[0].id);
       }
     } catch (err) {
-      console.error(err);
+      console.warn("Backend search failed, using local fallback.", err);
+      setSearchError("Failed to retrieve incidents. Local mode active.");
+      
+      try {
+        const results = await api.searchIncident(activeQuery);
+        const ranked = results
+          .sort((a, b) => b.confidence - a.confidence)
+          .slice(0, 3);
+        
+        setIncidents(ranked);
+        if (ranked.length > 0) {
+          setExpandedId(ranked[0].id);
+        }
+      } catch (fallbackErr) {
+        console.error(fallbackErr);
+        setIncidents([]);
+      }
     } finally {
       setSearching(false);
+    }
+  };
+
+  const handleStoreIncident = async () => {
+    if (!query.trim()) return;
+    setStoring(true);
+    setStoreStatusMsg("");
+    setStoredIncident(null);
+    setSearchError("");
+
+    try {
+      const result = await api.storeIncident(query, activeTabContext);
+      setStoredIncident(result);
+      setStoreStatusMsg("Incident stored successfully");
+      
+      setIncidents((prev) => {
+        const exists = prev.some((inc) => inc.id === result.id);
+        if (exists) return prev;
+        return [result, ...prev];
+      });
+      setExpandedId(result.id);
+      setSearched(true);
+    } catch (err) {
+      console.error(err);
+      setSearchError("Backend unavailable. Unable to reach AI service.");
+    } finally {
+      setStoring(false);
     }
   };
 
@@ -93,6 +155,52 @@ export const IncidentSearch: React.FC = () => {
 
   return (
     <div className="flex flex-col gap-3.5 animate-fadeIn font-premium-body">
+      {/* Error / Warning Alert */}
+      {searchError && (
+        <div className="flex items-start gap-2.5 p-3.5 border border-amber-955 bg-amber-955/15 text-amber-500 rounded-[14px]">
+          <ShieldAlert className="w-4 h-4 shrink-0 mt-0.5" />
+          <p className="text-[9px] leading-relaxed font-mono">{searchError}</p>
+        </div>
+      )}
+
+      {/* Store Success notification and Result */}
+      {storeStatusMsg && storedIncident && (
+        <GlassCard glow={true} className="border-emerald-500/35 bg-[#080808]/75 shadow-premium animate-fadeIn font-mono text-[9px]">
+          <div className="flex items-center gap-1.5 mb-3 text-emerald-450 font-bold uppercase tracking-wider">
+            <Check className="w-3.5 h-3.5" /> {storeStatusMsg}
+          </div>
+          
+          <div className="flex flex-col gap-3 font-premium-body">
+            <div>
+              <span className="text-zinc-550 font-bold block uppercase text-[7.5px] tracking-wider mb-1">
+                Root Cause:
+              </span>
+              <p className="text-zinc-300 bg-[#0a0a0a]/90 p-2.5 border border-zinc-900 rounded-[12px] leading-relaxed">
+                {storedIncident.root_cause || storedIncident.rootCause}
+              </p>
+            </div>
+            <div>
+              <span className="text-emerald-450 font-bold block uppercase text-[7.5px] tracking-wider mb-1">
+                Resolution:
+              </span>
+              <p className="text-zinc-200 bg-emerald-500/5 p-2.5 border border-emerald-500/15 rounded-[12px] leading-relaxed">
+                {storedIncident.resolution}
+              </p>
+            </div>
+            {storedIncident.context && (
+              <div>
+                <span className="text-zinc-550 font-bold block uppercase text-[7.5px] tracking-wider mb-1">
+                  Context:
+                </span>
+                <p className="text-zinc-400 font-mono text-[8px] bg-[#0a0a0a]/90 p-2 border border-zinc-900 rounded-[12px] break-all">
+                  {storedIncident.context}
+                </p>
+              </div>
+            )}
+          </div>
+        </GlassCard>
+      )}
+
       {/* Search Input Box */}
       <GlassCard className="border-zinc-850 bg-[#080808]/40 shadow-premium">
         <div className="font-mono text-[8px] text-zinc-500 uppercase tracking-widest mb-2 flex items-center justify-between">
@@ -108,21 +216,33 @@ export const IncidentSearch: React.FC = () => {
             e.preventDefault();
             handleSearch(query);
           }}
-          className="flex gap-2"
+          className="flex flex-col gap-2.5"
         >
-          <div className="relative flex-1 flex items-center">
-            <Search className="absolute left-3 w-3.5 h-3.5 text-zinc-650" />
+          <div className="relative flex items-center">
+            <Search className="absolute left-3 w-3.5 h-3.5 text-zinc-655" />
             <input
               type="text"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Paste logs or query (e.g. ECONNREFUSED)..."
+              placeholder="Paste logs or query (e.g. Redis timeout)..."
               className="w-full pl-9 pr-3 py-2 bg-[#0a0a0a]/80 border border-zinc-850 text-[10px] text-white placeholder-zinc-700 focus:outline-none focus:border-[#FF007A]/30 rounded-[20px]"
             />
           </div>
-          <NeonButton type="submit" variant="primary" className="px-4 py-2 shrink-0 h-9">
-            Search
-          </NeonButton>
+          
+          <div className="flex gap-2">
+            <NeonButton type="submit" variant="primary" className="flex-1 py-2 h-9 text-[9px]">
+              Search Incident
+            </NeonButton>
+            <NeonButton 
+              type="button" 
+              variant="secondary" 
+              onClick={handleStoreIncident}
+              disabled={!query.trim() || storing}
+              className="flex-1 py-2 h-9 text-[9px] border-zinc-850 hover:border-[#FF007A]/30"
+            >
+              {storing ? "Saving..." : "Save Incident To Memory"}
+            </NeonButton>
+          </div>
         </form>
 
         {/* Popular chips */}
@@ -334,16 +454,25 @@ export const IncidentSearch: React.FC = () => {
                         <p className="text-white bg-[#0a0a0a]/90 p-2 border border-zinc-900 rounded-[12px] text-[8.5px] leading-relaxed">
                           {inc.title}
                         </p>
-                      </div>
-
-                      {/* Timeline Step 2: Root Cause */}
+                                         {/* Timeline Step 2: Root Cause */}
                       <div className="relative">
                         <span className="absolute -left-[20.5px] top-1.5 w-2.5 h-2.5 rounded-full bg-[#A855F7] border border-black shadow-[0_0_4px_#A855F7]" />
                         <span className="text-zinc-550 font-bold block uppercase text-[7.5px] tracking-wider mb-1">ROOT CAUSE:</span>
                         <p className="text-zinc-400 bg-[#0a0a0a]/90 p-2 border border-zinc-900 rounded-[12px] text-[8.5px] leading-relaxed">
-                          {inc.rootCause}
+                          {inc.root_cause || inc.rootCause}
                         </p>
                       </div>
+
+                      {/* Timeline Step 2.5: Context */}
+                      {(inc.context || inc.errorQuery) && (
+                        <div className="relative">
+                          <span className="absolute -left-[20.5px] top-1.5 w-2.5 h-2.5 rounded-full bg-cyan-505 border border-black shadow-[0_0_4px_rgba(6,182,212,0.5)]" />
+                          <span className="text-cyan-455 font-bold block uppercase text-[7.5px] tracking-wider mb-1">CONTEXT:</span>
+                          <p className="text-zinc-400 bg-[#0a0a0a]/90 p-2 border border-zinc-900 rounded-[12px] text-[8.5px] leading-relaxed break-all font-mono">
+                            {inc.context || inc.errorQuery}
+                          </p>
+                        </div>
+                      )}
 
                       {/* Timeline Step 3: Resolution */}
                       <div className="relative">
@@ -352,7 +481,7 @@ export const IncidentSearch: React.FC = () => {
                         <p className="text-zinc-300 bg-[#FF007A]/5 p-2 border border-[#FF007A]/15 rounded-[12px] text-[8.5px] leading-relaxed">
                           {inc.resolution}
                         </p>
-                      </div>
+                      </div>     </div>
 
                       {/* Timeline Step 4: Lessons Learned */}
                       {inc.lessonsLearned && inc.lessonsLearned.length > 0 && (

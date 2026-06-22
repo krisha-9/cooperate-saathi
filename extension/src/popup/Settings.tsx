@@ -1,13 +1,25 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { GlassCard } from "../components/cards/GlassCard";
 import { NeonButton } from "../components/buttons/NeonButton";
-import { api } from "../services/api";
+import { api, checkBackendOnline } from "../services/api";
 import { Settings as SettingsIcon, ShieldCheck, Database, RefreshCw, Volume2 } from "lucide-react";
 
 export const Settings: React.FC = () => {
   const [autoCapture, setAutoCapture] = useState(true);
   const [notifications, setNotifications] = useState(true);
   const [statusMsg, setStatusMsg] = useState("");
+  const [isOnline, setIsOnline] = useState<boolean | null>(null);
+
+  // Poll backend status
+  useEffect(() => {
+    const checkStatus = async () => {
+      const online = await checkBackendOnline();
+      setIsOnline(online);
+    };
+    checkStatus();
+    const interval = setInterval(checkStatus, 5000);
+    return () => clearInterval(interval);
+  }, []);
 
   const handleReset = () => {
     api.resetLocalMemories();
@@ -23,6 +35,22 @@ export const Settings: React.FC = () => {
 
   return (
     <div className="flex flex-col gap-4 animate-fadeIn font-premium-body">
+      {/* Backend Connection status */}
+      <GlassCard className="border-zinc-850 bg-[#080808]/40 shadow-premium">
+        <div className="flex items-center justify-between font-mono text-[8px] uppercase tracking-widest">
+          <span className="text-zinc-500 font-bold">backend service status</span>
+          <span className={`px-2.5 py-1 rounded-full border text-[7.5px] font-bold ${
+            isOnline === true
+              ? "text-emerald-450 border-emerald-500/20 bg-emerald-500/5 shadow-[0_0_8px_rgba(16,185,129,0.15)]"
+              : isOnline === false
+              ? "text-rose-455 border-rose-500/20 bg-rose-500/5 shadow-[0_0_8px_rgba(244,63,94,0.15)]"
+              : "text-zinc-500 border-zinc-800 bg-zinc-900/5"
+          }`}>
+            {isOnline === true ? "🟢 Backend Connected" : isOnline === false ? "🔴 Backend Offline" : "🟡 Connecting..."}
+          </span>
+        </div>
+      </GlassCard>
+
       <GlassCard className="border-zinc-850 bg-[#080808]/40 shadow-premium">
         <div className="font-mono text-[8px] text-zinc-500 uppercase tracking-widest mb-3 flex items-center gap-1.5">
           <SettingsIcon className="w-3.5 h-3.5 text-cyberGreen" /> configuration preferences

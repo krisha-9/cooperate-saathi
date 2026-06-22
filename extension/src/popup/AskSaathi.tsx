@@ -224,39 +224,46 @@ export const AskSaathi: React.FC = () => {
     await new Promise((r) => setTimeout(r, 600));
     setTypingLogs((prev) => [...prev, "Analyzing engineering knowledge..."]);
     await new Promise((r) => setTimeout(r, 600));
-    setTypingLogs((prev) => [...prev, "Generating response..."]);
+    setTypingLogs((prev) => [...prev, "Generating answer..."]);
     await new Promise((r) => setTimeout(r, 600));
 
     try {
-      const matches = performSearch(text, memories);
-      let saathiMsg: ChatMessage;
+      let answerText = "";
+      let isFallback = false;
 
-      if (matches.length > 0) {
-        const topMatch = matches[0];
-        const answerText = getStructuredResponse(topMatch);
+      try {
+        const backendRes = await api.askQuestion(text);
+        answerText = backendRes.answer;
+      } catch (backendErr) {
+        console.warn("Ask backend offline, utilizing local simulation fallback.", backendErr);
+        isFallback = true;
         
-        saathiMsg = {
-          id: `saathi-${Date.now()}`,
-          sender: "saathi",
-          text: answerText,
-          timestamp: new Date(),
-          references: matches.slice(0, 3).map((m) => ({
-            title: m.title,
-            url: m.source_url,
-            type: m.memory_type
-          }))
-        };
-      } else {
-        const fallbackText = `🐺 I could not find relevant knowledge inside Parcle Memory.\n\nTry:\n• Capture more documentation\n• Search a different topic\n• Check Memory Vault`;
-        
-        saathiMsg = {
-          id: `saathi-${Date.now()}`,
-          sender: "saathi",
-          text: fallbackText,
-          timestamp: new Date(),
-          references: []
-        };
+        const matches = performSearch(text, memories);
+        if (matches.length > 0) {
+          answerText = getStructuredResponse(matches[0]);
+        } else {
+          answerText = `🐺 I could not find relevant knowledge inside Parcle Memory.\n\nTry:\n• Capture more documentation\n• Search a different topic\n• Check Memory Vault`;
+        }
       }
+
+      const matches = performSearch(text, memories);
+      const references = matches.slice(0, 3).map((m) => ({
+        title: m.title,
+        url: m.source_url,
+        type: m.memory_type
+      }));
+
+      const finalText = isFallback
+        ? `⚠️ Unable to reach AI service. Local mode active.\n\n${answerText}`
+        : answerText;
+
+      const saathiMsg: ChatMessage = {
+        id: `saathi-${Date.now()}`,
+        sender: "saathi",
+        text: finalText,
+        timestamp: new Date(),
+        references: references
+      };
 
       const finalMessages = [...updatedMessages, saathiMsg];
       setMessages(finalMessages);
@@ -266,7 +273,7 @@ export const AskSaathi: React.FC = () => {
       const errorMsg: ChatMessage = {
         id: `err-${Date.now()}`,
         sender: "saathi",
-        text: "Error querying Parcle Memory context.",
+        text: "Error: Backend unavailable. Local mode active.",
         timestamp: new Date()
       };
       const finalMessages = [...updatedMessages, errorMsg];

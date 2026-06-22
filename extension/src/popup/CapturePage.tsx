@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { GlassCard } from "../components/cards/GlassCard";
 import { NeonButton } from "../components/buttons/NeonButton";
 import { api } from "../services/api";
-import { Chrome, ShieldAlert, Sparkles, Terminal, CheckCircle2 } from "lucide-react";
+import { Chrome, ShieldAlert, Sparkles, Terminal, CheckCircle2, AlertTriangle } from "lucide-react";
 
 export const CapturePage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<{ title: string; url: string; id?: number } | null>(null);
@@ -46,9 +46,10 @@ export const CapturePage: React.FC = () => {
     setStatus("capturing");
     setTerminalLogs(["Reading page..."]);
 
-    // Step 1: Reading page... (Wait 1s)
-    await new Promise((r) => setTimeout(r, 1000));
-    setTerminalLogs((prev) => [...prev, "Extracting engineering knowledge..."]);
+    // Step 1: Reading page... (Wait 600ms)
+    await new Promise((r) => setTimeout(r, 600));
+    setTerminalLogs((prev) => [...prev, "Extracting content..."]);
+    await new Promise((r) => setTimeout(r, 600));
 
     let scraperData = {
       title: activeTab.title,
@@ -70,35 +71,40 @@ export const CapturePage: React.FC = () => {
         });
 
         if (response && response.success) {
-          scraperData = response.data;
+          scraperData = {
+            title: response.data.title,
+            url: response.data.url,
+            content: response.data.content
+          };
         }
       } catch (err) {
         console.warn("Content script trigger warning, utilizing fallback mappings.", err);
       }
     }
 
-    // Step 2: Extracting engineering knowledge... (Wait 1s)
-    await new Promise((r) => setTimeout(r, 1000));
-    setTerminalLogs((prev) => [...prev, "Generating summary..."]);
-
-    // Step 3: Generating summary... (Wait 1s)
-    await new Promise((r) => setTimeout(r, 1000));
-    setTerminalLogs((prev) => [...prev, "Saving to Parcle Memory..."]);
-
-    // Step 4: Saving to Parcle Memory... (Wait 1s)
-    await new Promise((r) => setTimeout(r, 1000));
+    // Step 3: Sending to backend...
+    setTerminalLogs((prev) => [...prev, "Sending to backend..."]);
+    await new Promise((r) => setTimeout(r, 600));
 
     try {
-      await api.capturePage(scraperData);
-      setTerminalLogs((prev) => [...prev, "✓ Successfully Stored In Parcle Memory"]);
+      // ingestPage first stores locally, then POSTs to /ingest-page
+      await api.ingestPage(scraperData);
       
-      // Give the user a moment to see the success checkmark
-      await new Promise((r) => setTimeout(r, 1000));
+      setTerminalLogs((prev) => [...prev, "Saving to Parcle..."]);
+      await new Promise((r) => setTimeout(r, 600));
+      setTerminalLogs((prev) => [...prev, "Success"]);
+      
+      await new Promise((r) => setTimeout(r, 800));
       setStatus("success");
+      setErrorMessage("");
     } catch (err) {
-      console.error(err);
-      setStatus("error");
-      setErrorMessage("Ingestion pipeline failed. Connection refused or permission block.");
+      console.warn("Backend sync failed during capture:", err);
+      // In hybrid mode, memory still remains stored locally.
+      setTerminalLogs((prev) => [...prev, "Stored locally. Backend sync unavailable."]);
+      
+      await new Promise((r) => setTimeout(r, 800));
+      setStatus("success");
+      setErrorMessage("Backend sync unavailable");
     }
   };
 
@@ -126,7 +132,7 @@ export const CapturePage: React.FC = () => {
             <h3 className="font-premium-header font-bold text-xs leading-snug line-clamp-2 text-white">
               {activeTab.title}
             </h3>
-            <p className="font-mono text-[8px] text-zinc-550 break-all bg-[#0a0a0a]/90 p-2 border border-zinc-900 rounded-[12px] hover:border-zinc-800 transition-colors">
+            <p className="font-mono text-[8px] text-zinc-555 break-all bg-[#0a0a0a]/90 p-2 border border-zinc-900 rounded-[12px] hover:border-zinc-800 transition-colors">
               {activeTab.url}
             </p>
           </div>
@@ -153,7 +159,7 @@ export const CapturePage: React.FC = () => {
       {/* Capturing Terminal console */}
       {(status === "capturing" || status === "success") && (
         <div className="flex flex-col gap-2">
-          <div className={`bg-[#050505] border p-4 rounded-[20px] font-mono text-[9px] text-zinc-300 h-38 overflow-y-auto flex flex-col gap-1 shadow-inner relative scrollbar-none transition-all duration-300 ${
+          <div className={`bg-[#050505] border p-4 rounded-[20px] font-mono text-[9px] text-zinc-305 h-38 overflow-y-auto flex flex-col gap-1 shadow-inner relative scrollbar-none transition-all duration-300 ${
             status === "success" 
               ? "border-[#FF007A]/40 shadow-[0_0_15px_rgba(255,0,122,0.15)]" 
               : "border-zinc-850"
@@ -164,14 +170,17 @@ export const CapturePage: React.FC = () => {
               parcle memory ingest
             </div>
             {terminalLogs.map((log, index) => {
-              const isSuccess = log.startsWith("✓");
-              const isSaving = log.includes("Saving");
+              const isSuccess = log.startsWith("✓") || log === "Success";
+              const isSyncError = log.includes("sync unavailable") || log.includes("Stored locally");
+              const isSaving = log.includes("Saving") || log.includes("Sending");
               return (
                 <div 
                   key={index} 
                   className={`leading-normal flex items-center gap-1.5 transition-all duration-200 ${
                     isSuccess 
-                      ? "text-[#FF007A] font-extrabold drop-shadow-[0_0_8px_rgba(255,0,122,0.5)]" 
+                      ? "text-emerald-450 font-extrabold drop-shadow-[0_0_8px_rgba(16,185,129,0.4)]" 
+                      : isSyncError
+                      ? "text-amber-500 font-bold"
                       : "text-zinc-400"
                   }`}
                 >
@@ -195,15 +204,29 @@ export const CapturePage: React.FC = () => {
 
       {/* Success notification */}
       {status === "success" && (
-        <div className="flex items-center gap-3 p-3.5 bg-[#FF007A]/5 border border-[#FF007A]/35 text-white rounded-[20px] shadow-glow-pink animate-fadeIn">
-          <CheckCircle2 className="w-4 h-4 text-[#FF007A] shrink-0" />
+        <div className={`flex items-center gap-3 p-3.5 border rounded-[20px] animate-fadeIn ${
+          errorMessage === "Backend sync unavailable"
+            ? "bg-amber-500/5 border-amber-500/35 text-white shadow-[0_0_15px_rgba(245,158,11,0.1)]"
+            : "bg-[#FF007A]/5 border-[#FF007A]/35 text-white shadow-glow-pink"
+        }`}>
+          {errorMessage === "Backend sync unavailable" ? (
+            <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0" />
+          ) : (
+            <CheckCircle2 className="w-4 h-4 text-[#FF007A] shrink-0" />
+          )}
           <div className="flex-1">
-            <h4 className="font-premium-header font-bold text-[10.5px] text-[#FF007A] uppercase tracking-wider leading-none">stored in parcle</h4>
+            <h4 className={`font-premium-header font-bold text-[10.5px] uppercase tracking-wider leading-none ${
+              errorMessage === "Backend sync unavailable" ? "text-amber-500" : "text-[#FF007A]"
+            }`}>
+              {errorMessage === "Backend sync unavailable" ? "stored locally" : "stored in parcle"}
+            </h4>
             <p className="text-[9px] text-zinc-300 mt-1 font-mono leading-normal">
-              Knowledge Block Added To Parcle Memory
+              {errorMessage === "Backend sync unavailable"
+                ? "Stored locally. Backend sync unavailable."
+                : "Knowledge Block Added To Parcle Memory"}
             </p>
           </div>
-          <NeonButton variant="dark" onClick={() => setStatus("idle")} className="px-2.5 py-1 text-[8px] h-7 border-zinc-850 bg-[#0c0c0c]/85">
+          <NeonButton variant="dark" onClick={() => { setStatus("idle"); setErrorMessage(""); }} className="px-2.5 py-1 text-[8px] h-7 border-zinc-850 bg-[#0c0c0c]/85">
             Dismiss
           </NeonButton>
         </div>

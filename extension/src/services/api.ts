@@ -71,11 +71,13 @@ export interface Incident {
   title: string;
   errorQuery: string;
   rootCause: string;
+  root_cause?: string;
   resolution: string;
   severity: "high" | "medium" | "low";
   timestamp: string;
   source: string;
   confidence: number;
+  context?: string;
   lessonsLearned?: string[];
   recommendedActions?: string[];
 }
@@ -317,29 +319,30 @@ let MOCK_INCIDENTS: Incident[] = [
 // Helper to determine if backend is online
 export const checkBackendOnline = async (): Promise<boolean> => {
   try {
-    const res = await fetch(`${BACKEND_URL}/memories`, { method: "HEAD", signal: AbortSignal.timeout(600) });
-    return res.ok || res.status === 405 || res.status === 404;
+    const res = await fetch(`${BACKEND_URL}/`, { method: "GET", signal: AbortSignal.timeout(1000) });
+    return res.ok || res.status === 404 || res.status === 405;
   } catch (err) {
-    return false;
+    try {
+      const res2 = await fetch(`${BACKEND_URL}/health`, { method: "GET", signal: AbortSignal.timeout(1000) });
+      return res2.ok;
+    } catch (err2) {
+      return false;
+    }
   }
 };
 
 export const api = {
-  // 1. Capture Page (POST /ingest-page)
-  async capturePage(page: {
+  // 1. Ingest Page (POST /ingest-page)
+  async ingestPage(page: {
     title: string;
     url: string;
-    domain?: string;
-    headings?: string[];
     content: string;
-  }): Promise<{ success: boolean; memory: Memory }> {
-    let hostname = page.domain || "";
-    if (!hostname) {
-      try {
-        hostname = new URL(page.url).hostname;
-      } catch (e) {
-        hostname = "unknown.domain";
-      }
+  }): Promise<{ success: boolean; message: string }> {
+    let hostname = "";
+    try {
+      hostname = new URL(page.url).hostname;
+    } catch (e) {
+      hostname = "unknown.domain";
     }
 
     const summary = `This page contains engineering documentation related to ${page.title || "deployment workflows"} and project setup instructions.`;
@@ -356,14 +359,20 @@ export const api = {
       source: hostname
     };
 
-    // Save to local storage
+    // Step 1: Save to local storage first (hybrid architecture)
     await saveMemoryToStorage(capturedMem);
 
+    // Step 2: POST to backend
     try {
       const response = await fetch(`${BACKEND_URL}/ingest-page`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(page),
+        body: JSON.stringify({
+          title: page.title,
+          url: page.url,
+          content: page.content
+        }),
+        signal: AbortSignal.timeout(5000)
       });
 
       if (!response.ok) throw new Error("HTTP error " + response.status);
@@ -373,7 +382,7 @@ export const api = {
         window.dispatchEvent(new CustomEvent("parcle-memory-updated"));
       }
 
-      return { success: true, memory: data };
+      return { success: true, message: data.message || "Ingested successfully" };
     } catch (err) {
       console.warn("[Saathi Link] FastAPI backend offline, simulating local Parcle Memory storage.", err);
       
@@ -384,7 +393,8 @@ export const api = {
         source_url: page.url,
         created_at: capturedAt,
         confidence: 0.95,
-        source: hostname
+        source: hostname,
+        summary
       };
       MOCK_MEMORIES.unshift(mockMem);
 
@@ -392,63 +402,161 @@ export const api = {
         window.dispatchEvent(new CustomEvent("parcle-memory-updated"));
       }
 
-      return { success: true, memory: mockMem };
+      // Throw error to signal sync failure so the UI can show backend sync unavailable message
+      throw new Error("Backend sync unavailable");
     }
   },
 
+  // Alias to preserve original name
+  async capturePage(page: {
+    title: string;
+    url: string;
+    domain?: string;
+    headings?: string[];
+    content: string;
+  }): Promise<{ success: boolean; memory: Memory }> {
+    const res = await this.ingestPage({
+      title: page.title,
+      url: page.url,
+      content: page.content
+    });
+    
+    // Construct return value expected by older components (if any)
+    const mockMem: Memory = {
+      id: `mem_${Date.now().toString().slice(-4)}`,
+      title: page.title,
+      memory_type: "documentation",
+      source_url: page.url,
+      created_at: new Date().toISOString(),
+      confidence: 0.95,
+      source: page.domain || "github.com",
+      summary: res.message
+    };
+    return { success: res.success, memory: mockMem };
+  },
+
   // 2. Ask Saathi (POST /ask)
-  async askSaathi(query: string): Promise<ChatResponse> {
+  async askQuestion(question: string): Promise<ChatResponse> {
     try {
       const response = await fetch(`${BACKEND_URL}/ask`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ query }),
+        body: JSON.stringify({ question }),
+        signal: AbortSignal.timeout(5000)
       });
 
       if (!response.ok) throw new Error("HTTP error " + response.status);
-      return await response.json();
+      const data = await response.json();
+      return {
+        answer: data.answer,
+        sources: [] // Will be populated locally by component to maintain styling and references
+      };
     } catch (err) {
       console.warn("[Saathi Link] FastAPI backend offline, triggering fallback response.", err);
-      await new Promise((r) => setTimeout(r, 1000));
-      
-      return {
-        answer: "🐺 I remember this. Memory retrieval will be connected soon.",
-        sources: [
-          { title: "README.md", url: "https://github.com/org/cooperate/blob/main/README.md", type: "documentation" }
-        ]
-      };
+      throw err;
     }
   },
 
+  // Alias to preserve original name
+  async askSaathi(query: string): Promise<ChatResponse> {
+    return this.askQuestion(query);
+  },
+
   // 3. Search Incidents (POST /search-incidents)
-  async searchIncident(query: string): Promise<Incident[]> {
+  async searchIncidents(error_message: string, context: string): Promise<Incident[]> {
     try {
       const response = await fetch(`${BACKEND_URL}/search-incidents`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ query }),
+        body: JSON.stringify({ error_message, context }),
+        signal: AbortSignal.timeout(5000)
       });
 
       if (!response.ok) throw new Error("HTTP error " + response.status);
-      return await response.json();
+      const data = await response.json();
+      
+      const rawIncidents = data.incidents || [];
+      return rawIncidents.map((inc: any, idx: number) => ({
+        id: inc.id || `inc_b_${idx}_${Date.now()}`,
+        title: inc.title || "Incident Match",
+        errorQuery: error_message,
+        rootCause: inc.root_cause || inc.rootCause || "Details in context",
+        root_cause: inc.root_cause || inc.rootCause || "Details in context",
+        resolution: inc.resolution || "Review logs and restart services",
+        severity: inc.severity || "medium",
+        timestamp: inc.timestamp || new Date().toISOString(),
+        source: inc.source || inc.context || "Backend Memory",
+        confidence: inc.confidence || 0.9,
+        context: inc.context || context,
+        lessonsLearned: inc.lessonsLearned || [],
+        recommendedActions: inc.recommendedActions || []
+      }));
     } catch (err) {
       console.warn("[Saathi Link] FastAPI backend offline, simulating incident retrieval.", err);
-      await new Promise((r) => setTimeout(r, 600));
-      
-      const q = query.toLowerCase().trim();
-      if (!q) return [];
-      
-      return MOCK_INCIDENTS.filter(
-        (inc) =>
-          inc.title.toLowerCase().includes(q) ||
-          inc.errorQuery.toLowerCase().includes(q) ||
-          inc.rootCause.toLowerCase().includes(q) ||
-          inc.resolution.toLowerCase().includes(q)
-      );
+      throw err;
     }
   },
 
-  // 4. Get Memories (GET /memories)
+  // Alias to preserve original name
+  async searchIncident(query: string): Promise<Incident[]> {
+    return this.searchIncidents(query, "");
+  },
+
+  // 4. Store Incident (POST /store-incident)
+  async storeIncident(error_message: string, context: string): Promise<Incident> {
+    try {
+      const response = await fetch(`${BACKEND_URL}/store-incident`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ error_message, context }),
+        signal: AbortSignal.timeout(5000)
+      });
+
+      if (!response.ok) throw new Error("HTTP error " + response.status);
+      const data = await response.json();
+
+      const storedInc: Incident = {
+        id: data.id || `inc_s_${Date.now()}`,
+        title: data.title || `Incident: ${error_message}`,
+        errorQuery: error_message,
+        rootCause: data.root_cause || data.rootCause || "No root cause generated",
+        root_cause: data.root_cause || data.rootCause || "No root cause generated",
+        resolution: data.resolution || "No resolution details provided",
+        severity: data.severity || "medium",
+        timestamp: data.timestamp || new Date().toISOString(),
+        source: data.source || data.context || "Stored Memory",
+        confidence: data.confidence || 0.95,
+        context: data.context || context,
+        lessonsLearned: data.lessonsLearned || [],
+        recommendedActions: data.recommendedActions || []
+      };
+
+      // Sync into local mock array as well for local lookup consistency
+      MOCK_INCIDENTS.unshift(storedInc);
+      return storedInc;
+    } catch (err) {
+      console.warn("[Saathi Link] Store incident backend offline, saving locally.", err);
+      const localInc: Incident = {
+        id: `inc_l_${Date.now().toString().slice(-4)}`,
+        title: `Incident: ${error_message}`,
+        errorQuery: error_message,
+        rootCause: `Local simulated root cause for "${error_message}".`,
+        root_cause: `Local simulated root cause for "${error_message}".`,
+        resolution: `Local simulated resolution for "${error_message}".`,
+        severity: "medium",
+        timestamp: new Date().toISOString(),
+        source: "Local Fallback Memory",
+        confidence: 0.9,
+        context: context,
+        lessonsLearned: ["Local mode active", "Backend sync was unavailable"],
+        recommendedActions: ["Verify service endpoints when backend online"]
+      };
+      MOCK_INCIDENTS.unshift(localInc);
+      return localInc;
+    }
+  },
+
+  // 5. Get Memories (GET /memories)
   async getMemories(): Promise<Memory[]> {
     const localCaptured = await getStoredMemories();
     const mappedLocal: Memory[] = localCaptured.map((m) => ({
@@ -463,7 +571,7 @@ export const api = {
     }));
 
     try {
-      const response = await fetch(`${BACKEND_URL}/memories`);
+      const response = await fetch(`${BACKEND_URL}/memories`, { signal: AbortSignal.timeout(3000) });
       if (!response.ok) throw new Error("HTTP error " + response.status);
       const data = await response.json();
       
